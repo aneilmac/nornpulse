@@ -1,0 +1,15 @@
+Cargo.lock
+Docking Station
+
+# Ghidra
+*.lock
+*.lock~
+*.prp
+*.gpr
+*.dat
+*.bak
+*.db
+projectState
+
+#IDA
+*.i64
