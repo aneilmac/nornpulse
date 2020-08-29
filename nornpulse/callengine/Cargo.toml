@@ -1,13 +1,18 @@
 [package]
-name = "c2ers"
+name = "callengine"
 version = "0.1.0"
 authors = ["Archibald Neil MacDonald <FortOyer@hotmail.co.uk>"]
 edition = "2018"
-build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+proc-macro = true
+
 [dependencies]
-sdl2 = "0.34"
-static_assertions = "0.1.1"
-log = "0.4.11"
+proc-macro2 = "1.0.19"
+quote = "1.0.7"
+
+[dependencies.syn]
+version = "1.0.39"
+features = ["full"]

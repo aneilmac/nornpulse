@@ -1,0 +1,5 @@
+{
+  "rust.target": "i686-pc-windows-msvc",
+  "rust-client.channel": "nightly",
+  "rust.unstable_features": true
+}

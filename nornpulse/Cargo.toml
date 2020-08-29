@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "callengine",
   "c2ers",
   "nornpulse"
 ]

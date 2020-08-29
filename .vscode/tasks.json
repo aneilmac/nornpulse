@@ -1,0 +1,53 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"subcommand": "build",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"label": "Rust: cargo build - nornpulse.dll",
+			"options": {
+				"cwd": "${cwd}/nornpulse"
+			}
+		},
+		{
+			"label": "Copy nornpulse.dll",
+			"type": "shell",
+			"command": "cp nornpulse/target/i686-pc-windows-msvc/debug/nornpulse.dll \"Docking Station\"",
+			"windows": {
+				"command": "Copy-Item 'nornpulse/target/i686-pc-windows-msvc/debug/nornpulse.dll' -Destination 'Docking Station'",
+			}
+		},
+		{
+			"label": "Run Docking Station",
+			"type": "shell",
+			"command": "./engine.exe",
+			"windows": {
+				"command": "cmd /c engine.exe | Out-Host"
+			},
+			"options": {
+					"cwd": "${cwd}/Docking Station"
+			}
+		},
+		{
+			"label": "Run nornpulse in engine.exe",
+			"dependsOn": ["Copy nornpulse.dll", "Run Docking Station"],
+			"dependsOrder": "sequence",
+			"problemMatcher": [],
+			"presentation": {
+				"echo": false,
+				"reveal": "always",
+				"focus": true,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": true
+			},
+		}
+	]
+}
