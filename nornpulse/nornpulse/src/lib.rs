@@ -3,20 +3,16 @@
 #![feature(maybe_uninit_ref)]
 
 #[macro_use]
-mod injection;
+mod utils;
 
-mod agents;
-mod input_manager;
-mod app;
-mod cpp_adapter;
-mod creature_history;
-mod directory_manager;
-mod flight_recorder;
+mod engine;
+mod startup;
 
+use startup::startup;
 use std::ffi::CStr;
 use winapi::shared::minwindef::HINSTANCE;
-
 use winapi::um::winnt::LPSTR;
+
 
 /// This function has the same function signature of `WinMain` in Win32
 /// applications and has become the new entry point for `WinMain` in Docking
@@ -34,22 +30,17 @@ pub extern "stdcall" fn nornpulse_main(
         .expect("Failed to set the FlightLogger. Aborting.");
 
     // Inject engine.exe with callback to functions defined in nornpulse.dll.
-    unsafe { inject_calls(); }
+    unsafe { engine::inject_calls(); }
 
     let cmd_line = unsafe { CStr::from_ptr(cmd_line) };
-    let exit_code = app::startup(h_instance, cmd_line);
+    let exit_code = startup(h_instance, cmd_line);
     match exit_code {
         Ok(i) => i,
         Err(i) => i
     }
 }
 
-unsafe fn inject_calls() {
-    flight_recorder::inject_calls();
-    agents::inject_calls();
-    app::inject_calls();
-    creature_history::inject_calls();
-}
+
 
 // let sdl_context = sdl2::init()
 //   .expect("Unable to initialize SDL2");

@@ -1,4 +1,4 @@
-use crate::cpp_adapter::CppString;
+use crate::utils::cpp_adapter::CppString;
 use c2ers::creature_history::{EventType, LifeEvent};
 
 #[repr(C, packed)]

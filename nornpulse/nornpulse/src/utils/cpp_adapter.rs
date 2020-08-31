@@ -1,4 +1,5 @@
 use std::os::raw::c_char;
+use callengine::call_engine;
 
 /// Representation of a C++ string. Contains C++
 #[repr(C, packed)]
@@ -11,20 +12,14 @@ pub struct CppString {
 
 /// Calls C++'s `delete` upon the given pointer. Segfaults will
 /// trigger if applied to any pointer than those allocated by `operator_new`.
-unsafe fn operator_delete(ptr: *mut libc::c_void) {
-    type OpDelete = unsafe extern "cdecl" fn(*mut libc::c_void);
-    let op_delete: OpDelete = std::mem::transmute(0x005870cc);
-    op_delete(ptr);
-}
+#[call_engine(0x005870cc, "cdecl")]
+unsafe fn operator_delete(ptr: *mut libc::c_void);
 
 /// Given a size, returns a newly allocated pointer using C++'s `new`.
 /// Segfaults will trigger if this is deallocated with anything other than
 /// `operator_delete`.
-unsafe fn operator_new(size: usize) -> *mut libc::c_void {
-    type OpNew = unsafe extern "cdecl" fn(usize) -> *mut libc::c_void;
-    let op_new: OpNew = std::mem::transmute(0x005870d2);
-    op_new(size)
-}
+#[call_engine(0x005870d2, "cdecl")]
+unsafe fn operator_new(size: usize) -> *mut libc::c_void;
 
 impl std::fmt::Display for CppString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -5,10 +5,11 @@ use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parenthesized, parse_macro_input, FnArg, Ident, LitInt, LitStr, ReturnType, Token, Visibility,
+    parenthesized, parse_macro_input, Attribute, FnArg, Ident, LitInt, LitStr, ReturnType, Token, Visibility,
 };
 
 struct EngineSig {
+    attrs: Vec<Attribute>,
     vis: Visibility,
     ident: Ident,
     inputs: Punctuated<FnArg, Comma>,
@@ -22,6 +23,9 @@ struct CallInfo {
 
 impl Parse for EngineSig {
     fn parse(input: ParseStream) -> Result<Self> {
+        // Parse attributes.
+        let attrs = input.call(Attribute::parse_outer)?;
+
         // Parse function visibility
         let vis: syn::Visibility = input.parse()?;
 
@@ -42,6 +46,7 @@ impl Parse for EngineSig {
         input.parse::<Token![;]>()?;
 
         Ok(EngineSig {
+            attrs: attrs,
             vis: vis,
             ident: ident,
             inputs: inputs,
@@ -102,6 +107,7 @@ fn ffi_types(input: &Punctuated<FnArg, Comma>) -> TokenStream2 {
 pub fn call_engine(address_attrs: TokenStream, item: TokenStream) -> TokenStream {
     let engine_sig = parse_macro_input!(item);
     let EngineSig {
+        attrs,
         vis,
         ident,
         inputs,
@@ -129,6 +135,8 @@ pub fn call_engine(address_attrs: TokenStream, item: TokenStream) -> TokenStream
     };
 
     let expanded = quote! {
+      #(#attrs)
+* 
       #vis unsafe fn #ident(#inputs) #output
       {
         type F = unsafe extern #conventions fn(#arg_types) #output;

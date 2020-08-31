@@ -1,69 +1,19 @@
-use crate::cpp_adapter::CppString;
-use crate::directory_manager;
-use crate::input_manager::InputManager;
-
+use crate::engine::app::{get_the_app, App};
+use crate::engine::directory_manager::get_directory_manager;
 use callengine::call_engine;
-
-use winapi::shared::windef::HWND;
 use std::ffi::CStr;
-
 use winapi::shared::minwindef::HINSTANCE;
-use winapi::shared::minwindef::UINT;
 use winapi::shared::minwindef::LPARAM;
-use winapi::shared::minwindef::WPARAM;
 use winapi::shared::minwindef::LRESULT;
+use winapi::shared::minwindef::UINT;
+use winapi::shared::minwindef::WPARAM;
+use winapi::shared::windef::HWND;
 
-static mut SCROLLWHEEL_MESSAGE_ID : UINT = 0;
-
-#[repr(C, packed)]
-pub struct App {
-    _unknown1: [u8; 184], // 0 - 183
-    pub input_manager: *mut InputManager, // 184 - 187
-    pub _0xbc: usize, // 188 - 191
-    pub _0xc0: usize, // 192 - 195
-    pub _0xc4: usize, // 196 - 199,
-    pub _0xc8: usize, // 200 - 203,
-    pub _0xcc: usize, // 204 - 207
-    pub _0xd0: usize, // 208 - 211,
-    pub _0xd4: usize, // 212 - 215
-    pub _0xd8: usize, // 216 - 219,
-    pub _0xdc: usize, // 220 - 223
-    pub _0xe0: usize, // 224 - 227
-    pub _0xe4: usize, // 228 - 231
-    pub _0xe8: usize, // 232 - 235
-    pub _0xec: usize, // 236 - 239
-    _unknown2: [u8;77] // 240 - 316
-}
-
-#[call_engine(0x0054cc50, "cdecl")]
-pub unsafe fn get_the_app() -> &'static mut App;
-
-impl App {
-    pub fn process_command_line(&self, cmd_line: &CStr) -> bool {
-        type CommandLineFn = unsafe extern "thiscall" fn(app: &App, param1: CppString) -> bool;
-        const PROCESS_COMMAND_LINE: u32 = 0x005511f0;
-
-        let process_command_line: CommandLineFn =
-            unsafe { std::mem::transmute(PROCESS_COMMAND_LINE) };
-
-        unsafe { process_command_line(self, CppString::from_c_str(cmd_line.as_ptr())) }
-    }
-
-    #[call_engine(0x0054e000)]
-    pub unsafe fn update(&self);
-
-    #[call_engine(0x05578b0)]
-    pub unsafe fn init_config_files(&self) -> bool;
-
-    #[call_engine(0x0054f210)]
-    pub unsafe fn init_localization(&self) -> bool;
-}
-
-pub fn init_instance(h_instance: HINSTANCE) -> bool {
+fn init_instance(h_instance: HINSTANCE) -> bool {
     let app = unsafe { get_the_app() };
     log::debug!("Init config files");
-    let success = unsafe { app.init_config_files() };
-    
+    let success = unsafe { (*app).init_config_files() };
+
     if !success {
         log::debug!("Init failed.");
         return false;
@@ -71,9 +21,9 @@ pub fn init_instance(h_instance: HINSTANCE) -> bool {
 
     log::debug!("Setting up directory manager");
 
-    let d = unsafe {  directory_manager::get_directory_manager() };
+    let d = unsafe { get_directory_manager() };
 
-    let success = unsafe {  d.read_from_configuration_files() };
+    let success = unsafe { d.read_from_configuration_files() };
     if !success {
         log::error!("Failed to read configuration files.");
         return false;
@@ -91,13 +41,8 @@ pub fn init_instance(h_instance: HINSTANCE) -> bool {
     // to do with testing an unhappy path of the configuration. We will ignore.
 
     log::debug!("Mousehweel support");
-    
+
     use winapi::um::winuser;
-    unsafe {
-        let cstr = CStr::from_bytes_with_nul(b"MSWHEEL_ROLLMSG\0").unwrap();
-        SCROLLWHEEL_MESSAGE_ID = winuser::RegisterWindowMessageA(cstr.as_ptr());
-    }
-    
     let engine_cstr = CStr::from_bytes_with_nul(b"engine\0").unwrap();
 
     unsafe {
@@ -105,29 +50,26 @@ pub fn init_instance(h_instance: HINSTANCE) -> bool {
 
         let icon_name = CStr::from_bytes_with_nul(b"Docking Station.ico\0").unwrap();
         let icon = winuser::LoadImageA(
-            std::ptr::null_mut(), 
-            icon_name.as_ptr(), 
-            winuser::IMAGE_ICON, 
-            0, 
+            std::ptr::null_mut(),
+            icon_name.as_ptr(),
+            winuser::IMAGE_ICON,
             0,
-            winuser::LR_LOADFROMFILE
+            0,
+            winuser::LR_LOADFROMFILE,
         );
 
         let class_a = winuser::WNDCLASSA {
             style: winuser::CS_VREDRAW | winuser::CS_HREDRAW,
             cbClsExtra: 0,
             cbWndExtra: 0,
-            hCursor: winuser::LoadCursorA(
-                std::ptr::null_mut(), 
-                std::ptr::null()
-            ),
+            hCursor: winuser::LoadCursorA(std::ptr::null_mut(), std::ptr::null()),
             hbrBackground: winapi::um::wingdi::GetStockObject(
-                winapi::um::wingdi::BLACK_BRUSH as i32
-                         ) as winapi::shared::windef::HBRUSH,
+                winapi::um::wingdi::BLACK_BRUSH as i32,
+            ) as winapi::shared::windef::HBRUSH,
             lpszClassName: engine_cstr.as_ptr(),
             lpszMenuName: std::ptr::null(),
             hIcon: icon as winapi::shared::windef::HICON,
-            lpfnWndProc: std::mem::transmute(0x00477d70),
+            lpfnWndProc: Some(window_proc),
             hInstance: h_instance,
         };
 
@@ -142,14 +84,14 @@ pub fn init_instance(h_instance: HINSTANCE) -> bool {
         log::debug!("Creating window");
 
         let hwnd = winuser::CreateWindowExA(
-            winuser::WS_EX_LEFTSCROLLBAR, 
-            engine_cstr.as_ptr(), 
+            winuser::WS_EX_LEFTSCROLLBAR,
             engine_cstr.as_ptr(),
-            winuser::WS_CAPTION 
-                | winuser::WS_VISIBLE 
-                | winuser::WS_SYSMENU 
+            engine_cstr.as_ptr(),
+            winuser::WS_CAPTION
+                | winuser::WS_VISIBLE
+                | winuser::WS_SYSMENU
                 | winuser::WS_SIZEBOX
-                | winuser::WS_TABSTOP 
+                | winuser::WS_TABSTOP
                 | winuser::WS_GROUP,
             0,
             0,
@@ -158,7 +100,7 @@ pub fn init_instance(h_instance: HINSTANCE) -> bool {
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
-            std::ptr::null_mut()
+            std::ptr::null_mut(),
         );
 
         if hwnd.is_null() {
@@ -184,14 +126,14 @@ pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
 
     if !success {
         log::error!("Could not parse command-line arguments. Aborting");
-        return Err(1)
+        return Err(1);
     }
 
     let success = init_instance(h_instance);
 
     if !success {
         log::error!("Could not initialize app. Aborting");
-        return Err(1)
+        return Err(1);
     }
 
     log::info!("Entering main message loop.");
@@ -216,7 +158,7 @@ pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
             }
         }
 
-        let result =       update_app(winuser::WM_NULL, 0x3ff, false)
+        let result = update_app(winuser::WM_NULL, 0x3ff, false)
             .and_then(|()| update_app(winuser::WM_USER, winuser::WM_USER, true))
             .and_then(|()| update_app(winuser::WM_USER + 2, winuser::WM_USER + 2, false))
             .and_then(|()| update_app(winuser::WM_USER + 1, winuser::WM_USER + 1, false))
@@ -230,8 +172,7 @@ pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
         unsafe {
             let our_terminate: *mut bool = std::mem::transmute(0x0060eb59);
             if *our_terminate {
-                let s =
-                    winuser::DestroyWindow(*std::mem::transmute::<u32, *mut HWND>(0x0060ebe0));
+                let s = winuser::DestroyWindow(*std::mem::transmute::<u32, *mut HWND>(0x0060ebe0));
                 log::debug!("Terminate window triggered. Success: {}", s);
                 our_quit = true;
             }
@@ -250,26 +191,23 @@ fn update_app(filter_min: u32, filter_max: u32, do_once: bool) -> Option<()> {
 
     let mut has_messages: i32 = 0;
 
-    while has_messages != -1 && unsafe {
+    while has_messages != -1
+        && unsafe {
             let mut message = winuser::MSG::default();
             let b_val = winuser::PeekMessageA(
-                    &mut message, 
-                    std::ptr::null_mut(), 
-                    filter_min,
-                    filter_max,
-                    winuser::PM_NOREMOVE
-                );
+                &mut message,
+                std::ptr::null_mut(),
+                filter_min,
+                filter_max,
+                winuser::PM_NOREMOVE,
+            );
             b_val != 0
         }
     {
         let mut message = winuser::MSG::default();
         unsafe {
-            has_messages = winuser::GetMessageA(
-                &mut message, 
-                std::ptr::null_mut(), 
-                filter_min, 
-                filter_max
-            );
+            has_messages =
+                winuser::GetMessageA(&mut message, std::ptr::null_mut(), filter_min, filter_max);
         }
 
         if has_messages == 0 {
@@ -313,46 +251,101 @@ fn do_post_update(app: &mut App) {
     } else {
         app._0xd4 = i;
     }
-    
+
+    let input_manager = &mut app.input_manager;
+
     unsafe {
-        *std::mem::transmute::<usize, *mut usize>(app._0xdc + app._0xd4 * 4) = app._0xcc;
-        *std::mem::transmute::<usize, *mut usize>(app._0xec + app._0xd4 * 4) = app._0xd0;
+        *std::mem::transmute::<usize, *mut i32>(app._0xdc + app._0xd4 * 4) = input_manager.mouse_x;
+        *std::mem::transmute::<usize, *mut i32>(app._0xec + app._0xd4 * 4) = input_manager.mouse_y;
     }
 
-    app._0xc0 = app._0xbc;
-    app._0xc8 = 0;
+    input_manager._unknown2 = input_manager._unknown1;
+    input_manager.pending_mask = 0;
 }
 
-// pub unsafe extern "stdcall" fn window_proc(
-//     hwnd: HWND, 
-//     u_msg: UINT, 
-//     w_param: WPARAM, 
-//     l_param: LPARAM
-// ) -> LRESULT {
-//     use winapi::um::winuser;
+unsafe extern "system" fn window_proc(
+    hwnd: HWND,
+    u_msg: UINT,
+    w_param: WPARAM,
+    l_param: LPARAM,
+) -> LRESULT {
+    use winapi::um::winuser;
 
-//     let app = get_the_app();
+    let app = get_the_app();
+    let input_manager = &app.input_manager;
 
-//     if u_msg == SCROLLWHEEL_MESSAGE_ID {
-
-//     } else {
-//         match u_msg {
-//             SCROLLWHEEL_MESSAGE_ID => (),
-//             _ => winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param),
-//         }
-//     }
-// }
-
-pub unsafe fn inject_calls() {
-    use injected_calls::*;
-    replace_call!(0x00556030, check_for_cd);
-}
-
-mod injected_calls {
-    use super::*;
-
-    // C2E:0x00556030
-    pub extern "thiscall" fn check_for_cd(_app: &App) -> bool {
-        true // Where we're going, we don't need CDs!
+    match u_msg {
+        winuser::WM_CLOSE => {
+            winuser::PostMessageA(hwnd, winuser::WM_KEYDOWN, winuser::VK_ESCAPE as usize, 0);
+            winuser::PostMessageA(hwnd, winuser::WM_KEYUP, winuser::VK_ESCAPE as usize, 0);
+            return 0;
+        }
+        winuser::WM_MOUSEMOVE => {
+            input_manager.sys_add_mouse_move_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param)
+            );
+            return 0;
+        }
+        winuser::WM_LBUTTONDOWN => {
+            input_manager.sys_add_mouse_down_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                1,
+            );
+            return 0;
+        }
+        winuser::WM_LBUTTONUP => {
+            input_manager.sys_add_mouse_up_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                1,
+            );
+            return 0;
+        }
+        winuser::WM_RBUTTONDOWN => {
+            input_manager.sys_add_mouse_down_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                2,
+            );
+            return 0;
+        }
+        winuser::WM_RBUTTONUP => {
+            input_manager.sys_add_mouse_up_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                2,
+            );
+            return 0;
+        }
+        winuser::WM_MBUTTONDOWN => {
+            input_manager.sys_add_mouse_down_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                4,
+            );
+            return 0;
+        }
+        winuser::WM_MBUTTONUP => {
+            input_manager.sys_add_mouse_up_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                4,
+            );
+            return 0;
+        }
+        winuser::WM_MOUSEHWHEEL => {
+            input_manager.sys_add_mouse_wheel_event(
+                winapi::shared::windowsx::GET_X_LPARAM(l_param),
+                winapi::shared::windowsx::GET_Y_LPARAM(l_param),
+                w_param
+            );
+            return 0;
+        }
+        _ => return raw_window_proc(hwnd, u_msg, w_param, l_param)
     }
 }
+
+#[call_engine(0x00477d70, "system")]
+unsafe fn raw_window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;

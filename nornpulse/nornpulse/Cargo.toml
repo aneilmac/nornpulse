@@ -25,4 +25,5 @@ features = ["memoryapi",
             "winuser", 
             "timeapi",
             "errhandlingapi", 
-            "impl-default"]
+            "impl-default",
+            "windowsx"]
