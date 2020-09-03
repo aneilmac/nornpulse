@@ -3,14 +3,14 @@ use c2ers::agents as ca;
 
 pub unsafe fn inject_calls() {
     use injected_calls::*;
-    replace_call!(0x0047fe50, new_agenthandle);
-    replace_call!(0x0049c7c0, new_agenthandle_from);
-    replace_call!(0x0049c7e0, new_agenthandle_from);
-    replace_call!(0x0049c810, agenthandle_clone);
-    //replace_call!(0x0049c840, agents::agenthandle_drop);
-    replace_call!(0x0049c9b0, agenthandle_neq);
-    replace_call!(0x0049c990, agenthandle_eq);
-    replace_call!(0x0049c9d0, agenthandle_lessthan);
+    // replace_call!(0x0047fe50, new_agenthandle);
+    // replace_call!(0x0049c7c0, new_agenthandle_from);
+    // replace_call!(0x0049c7e0, new_agenthandle_from);
+    // replace_call!(0x0049c810, agenthandle_clone);
+    // //replace_call!(0x0049c840, agents::agenthandle_drop);
+    // replace_call!(0x0049c9b0, agenthandle_neq);
+    // replace_call!(0x0049c990, agenthandle_eq);
+    // replace_call!(0x0049c9d0, agenthandle_lessthan);
 }
 
 mod injected_calls {

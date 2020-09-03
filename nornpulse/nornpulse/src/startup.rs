@@ -1,5 +1,5 @@
-use crate::engine::app::{get_the_app, App};
-use crate::engine::directory_manager::get_directory_manager;
+use crate::engine::app::App;
+use crate::engine::directory_manager::DirectoryManager;
 use callengine::call_engine;
 use std::ffi::CStr;
 use winapi::shared::minwindef::HINSTANCE;
@@ -8,9 +8,20 @@ use winapi::shared::minwindef::LRESULT;
 use winapi::shared::minwindef::UINT;
 use winapi::shared::minwindef::WPARAM;
 use winapi::shared::windef::HWND;
+use winapi::shared::minwindef::LOWORD;
+
+mod global {
+    use super::*;
+    pub const HWND: *mut HWND = unsafe { std::mem::transmute(0x0060ebe0) };
+    pub const GAME_RUNNING: *mut bool = unsafe { std::mem::transmute(0x0060eba8) };
+    pub const QUIT_ACTION: *mut bool = unsafe { std::mem::transmute(0x0060ebd8) };
+    pub const PROGRESS_GAME_TIME: *mut bool = unsafe { std::mem::transmute(0x0060eb58) };
+    pub const OUR_TERMINATE: *mut bool = unsafe { std::mem::transmute(0x0060eb59) };
+    pub const BOOL_0X0060EB5A: *mut bool = unsafe { std::mem::transmute(0x0060eb5a) };
+}
 
 fn init_instance(h_instance: HINSTANCE) -> bool {
-    let app = unsafe { get_the_app() };
+    let app = unsafe { App::get() };
     log::debug!("Init config files");
     let success = unsafe { (*app).init_config_files() };
 
@@ -21,7 +32,7 @@ fn init_instance(h_instance: HINSTANCE) -> bool {
 
     log::debug!("Setting up directory manager");
 
-    let d = unsafe { get_directory_manager() };
+    let d = unsafe { DirectoryManager::get() };
 
     let success = unsafe { d.read_from_configuration_files() };
     if !success {
@@ -39,8 +50,6 @@ fn init_instance(h_instance: HINSTANCE) -> bool {
 
     // Starting from 0x0047779f something happens here I can't fathom. Something
     // to do with testing an unhappy path of the configuration. We will ignore.
-
-    log::debug!("Mousehweel support");
 
     use winapi::um::winuser;
     let engine_cstr = CStr::from_bytes_with_nul(b"engine\0").unwrap();
@@ -95,8 +104,8 @@ fn init_instance(h_instance: HINSTANCE) -> bool {
                 | winuser::WS_GROUP,
             0,
             0,
-            0x326,
-            0x271,
+            0x326, // width
+            0x271, // height
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             h_instance,
@@ -108,7 +117,7 @@ fn init_instance(h_instance: HINSTANCE) -> bool {
             return false;
         }
 
-        *std::mem::transmute::<u32, *mut HWND>(0x0060ebe0) = hwnd;
+        *global::HWND = hwnd;
     }
 
     true
@@ -116,11 +125,11 @@ fn init_instance(h_instance: HINSTANCE) -> bool {
 
 pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
     unsafe {
-        *std::mem::transmute::<u32, *mut u32>(0x0060eba8) = 1;
+        *global::GAME_RUNNING = true;
         winapi::um::timeapi::timeBeginPeriod(1);
     }
 
-    let app = unsafe { get_the_app() };
+    let app = unsafe { App::get() };
 
     let success = app.process_command_line(cmd_line);
 
@@ -146,15 +155,14 @@ pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
         //let _ = unsafe { winuser::WaitMessage() };
 
         unsafe {
-            let quit_action: *mut bool = std::mem::transmute(0x0060ebd8);
-            if *quit_action {
+            if *global::QUIT_ACTION {
                 winuser::PostMessageA(
-                    *std::mem::transmute::<u32, *mut HWND>(0x0060ebe0),
+                    *global::HWND,
                     winuser::WM_USER + 1,
                     0,
                     0,
                 );
-                *quit_action = false;
+                *global::QUIT_ACTION = false;
             }
         }
 
@@ -170,9 +178,8 @@ pub fn startup(h_instance: HINSTANCE, cmd_line: &CStr) -> Result<i32, i32> {
         }
 
         unsafe {
-            let our_terminate: *mut bool = std::mem::transmute(0x0060eb59);
-            if *our_terminate {
-                let s = winuser::DestroyWindow(*std::mem::transmute::<u32, *mut HWND>(0x0060ebe0));
+            if *global::OUR_TERMINATE {
+                let s = winuser::DestroyWindow(*global::HWND);
                 log::debug!("Terminate window triggered. Success: {}", s);
                 our_quit = true;
             }
@@ -216,15 +223,14 @@ fn update_app(filter_min: u32, filter_max: u32, do_once: bool) -> Option<()> {
             if has_messages != -1 {
                 if message.message == winuser::WM_USER {
                     unsafe {
-                        if *std::mem::transmute::<u32, *const u8>(0x0060eba8) != 0 {
-                            *std::mem::transmute::<u32, *mut u8>(0x0060eb5a) = 0;
-                            let bool_0060eb58: *mut bool = std::mem::transmute(0x0060eb58);
-                            if false == *bool_0060eb58 {
-                                *bool_0060eb58 = true;
-                                let app: &mut App = get_the_app();
+                        if *global::GAME_RUNNING != false {
+                            *global::BOOL_0X0060EB5A = false;
+                            if false == *global::PROGRESS_GAME_TIME {
+                                *global::PROGRESS_GAME_TIME = true;
+                                let app: &mut App = App::get();
                                 app.update();
                                 do_post_update(app);
-                                *bool_0060eb58 = false;
+                                *global::PROGRESS_GAME_TIME = false;
                             }
                         }
                     }
@@ -263,6 +269,9 @@ fn do_post_update(app: &mut App) {
     input_manager.pending_mask = 0;
 }
 
+static mut WINDOW_HAS_MOVED: bool = false;
+static mut WINDOW_HAS_RESIZED: bool = false;
+
 unsafe extern "system" fn window_proc(
     hwnd: HWND,
     u_msg: UINT,
@@ -271,14 +280,46 @@ unsafe extern "system" fn window_proc(
 ) -> LRESULT {
     use winapi::um::winuser;
 
-    let app = get_the_app();
-    let input_manager = &app.input_manager;
+    let input_manager = &mut App::get().input_manager;
+
+    if WINDOW_HAS_MOVED {
+        App::get().window_has_moved();
+        WINDOW_HAS_MOVED = false;
+    }
+
+    if WINDOW_HAS_RESIZED {
+        App::get().window_has_resized();
+        WINDOW_HAS_RESIZED = false;
+    }
 
     match u_msg {
+        winuser::WM_CREATE => {
+            *global::HWND = hwnd;
+            let success = do_startup(hwnd);
+            if !success {
+                winuser::DestroyWindow(hwnd);
+            }
+            return 0;
+        }
+        winuser::WM_DESTROY => {
+            log::debug!("Do shutdown");
+            message_destroy_called();
+            winuser::PostQuitMessage(1);
+            return 0;
+        }
         winuser::WM_CLOSE => {
             winuser::PostMessageA(hwnd, winuser::WM_KEYDOWN, winuser::VK_ESCAPE as usize, 0);
             winuser::PostMessageA(hwnd, winuser::WM_KEYUP, winuser::VK_ESCAPE as usize, 0);
             return 0;
+        }
+        winuser::WM_MOVE => {
+            WINDOW_HAS_MOVED = true;
+            WINDOW_HAS_RESIZED = true;
+            return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+        }
+        winuser::WM_SIZE => {
+            WINDOW_HAS_RESIZED = true;
+            return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
         }
         winuser::WM_MOUSEMOVE => {
             input_manager.sys_add_mouse_move_event(
@@ -343,9 +384,147 @@ unsafe extern "system" fn window_proc(
             );
             return 0;
         }
-        _ => return raw_window_proc(hwnd, u_msg, w_param, l_param)
+        winuser::WM_SETCURSOR => {
+            if LOWORD(l_param as u32) as LPARAM == winuser::HTCLIENT {
+                winuser::SetCursor(std::ptr::null_mut());
+                return 1;
+            } else {
+                return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+            }
+        }
+        winuser::WM_SYSCOMMAND => {
+            if App::get().is_full_screen() {
+                return 1;
+            } else {
+                return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+            }
+        }
+        winuser::WM_QUERYENDSESSION => {
+            if !hwnd.is_null() {
+                winuser::SetForegroundWindow(hwnd);
+            }
+            winuser::PostMessageA(hwnd, winuser::WM_KEYDOWN, winuser::VK_ESCAPE as usize, 0);
+            winuser::PostMessageA(hwnd, winuser::WM_KEYUP, winuser::VK_ESCAPE as usize, 0);
+            return 0;
+        }
+        winuser::WM_NCHITTEST => {
+            if App::get().is_full_screen() {
+                return 1;
+            } else {
+                return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+            }
+        }
+        winuser:: WM_SYSKEYUP => {
+            if !*global::PROGRESS_GAME_TIME
+            && !hwnd.is_null() 
+            && w_param == winuser::VK_RETURN as usize {
+                App::get().toggle_full_screen_mode();
+            }
+            return 0;
+        }
+        winuser::WM_ERASEBKGND => {
+            // TODO. Doesn't seem to have much of an effect.
+            return 0;
+        }
+        winuser::WM_KEYDOWN => {
+            let key = w_param as i32;
+            if key == winuser::VK_CANCEL {
+                // TODO Break Key. (CTRL+PAUSE). Shows a dialog saying 
+                // "This will quit creatures without saving." On yes the game
+                // quits. Otherwise no-op.
+                return 0;
+            } else if key == winuser::VK_PAUSE  {
+                // TODO: Pause key pressed. Pause game and open settings
+                // panel.
+                return 0;
+            }
+            else {
+                // TODO space key test for something?
+                input_manager.sys_add_key_down_event(w_param as i32);
+                return 0;
+            }
+        }
+        winuser::WM_KEYUP => { 
+            input_manager.sys_add_key_up_event(w_param as i32);
+            return 0;
+        }
+        winuser::WM_CHAR => {
+            input_manager.sys_add_translated_char_event(w_param as i32);
+            return 0;
+        }
+        winuser::WM_DEADCHAR => {
+            input_manager.sys_add_translated_char_event(w_param as i32);
+            return 0;
+        }
+        winuser::WM_SYSKEYDOWN => {
+            input_manager.sys_add_translated_char_event(w_param as i32);
+            return 0;
+        }
+        winuser::WM_ENTERMENULOOP => {
+            if *global::PROGRESS_GAME_TIME {
+                return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+            }
+            else {
+                *global::PROGRESS_GAME_TIME = true;
+                return 0;
+            }
+        }
+        winuser::WM_EXITMENULOOP => {
+            *global::PROGRESS_GAME_TIME = false;
+            return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+        }
+        winuser::WM_ENTERSIZEMOVE => {
+            if *global::PROGRESS_GAME_TIME {
+                return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param);
+            }
+            else {
+                *global::PROGRESS_GAME_TIME = true;
+                return 0;
+            }
+        }
+        winuser::WM_EXITSIZEMOVE => {
+            *global::PROGRESS_GAME_TIME = true;
+            return 0;
+        }
+        winuser::WM_USER => {
+            *global::BOOL_0X0060EB5A = false;
+            return 0;
+        }
+        0x401 => {
+            if *global::PROGRESS_GAME_TIME {
+                *global::QUIT_ACTION = true;
+            } else {
+                *global::PROGRESS_GAME_TIME = true;
+                fun_0050ca30();
+                *global::PROGRESS_GAME_TIME = false;
+            }
+            return 0;
+        }
+        0x402 => {
+            *global::BOOL_0X0060EB5A = false;
+            if !*global::PROGRESS_GAME_TIME {
+                *global::PROGRESS_GAME_TIME = true;
+                fun_00471ed0();
+                fun_00473570();
+                *global::PROGRESS_GAME_TIME = false;
+            }
+            return 0;
+        }
+        _ => return winuser::DefWindowProcA(hwnd, u_msg, w_param, l_param)
     }
 }
 
-#[call_engine(0x00477d70, "system")]
-unsafe fn raw_window_proc(hwnd: HWND, u_msg: UINT, w_param: WPARAM, l_param: LPARAM) -> LRESULT;
+#[call_engine(0x00478c50)]
+unsafe fn message_destroy_called();
+
+#[call_engine(0x00477e9e)]
+unsafe fn do_startup(hwnd: HWND) -> bool;
+
+#[call_engine(0x0050ca30)]
+unsafe fn fun_0050ca30();
+
+#[call_engine(0x00471ed0)]
+unsafe fn fun_00471ed0();
+
+#[call_engine(0x00473570)]
+unsafe fn fun_00473570();

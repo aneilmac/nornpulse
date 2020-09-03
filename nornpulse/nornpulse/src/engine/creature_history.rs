@@ -108,7 +108,7 @@ impl std::fmt::Debug for FFILifeEvent {
 pub unsafe fn inject_calls() {
     use injected_calls::*;
     // Creature History
-    replace_call!(0x0044f990, creature_present_for_event);
+    //replace_call!(0x0044f990, creature_present_for_event);
     //replace_call!(0x0041ad80, creature_history::copy_test);
     //replace_call!(0x0041b0c0, lifeevent_drop);
 }

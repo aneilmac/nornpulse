@@ -17,11 +17,8 @@ pub struct App {
     _unknown2: [u8;77] // 240 - 316
 }
 
-#[call_engine(0x0054cc50, "cdecl")]
-pub unsafe fn get_the_app() -> &'static mut App;
-
 impl App {
-    pub fn process_command_line(&self, cmd_line: &CStr) -> bool {
+    pub fn process_command_line(&mut self, cmd_line: &CStr) -> bool {
         type CommandLineFn = unsafe extern "thiscall" fn(app: &App, param1: CppString) -> bool;
         const PROCESS_COMMAND_LINE: u32 = 0x005511f0;
 
@@ -31,17 +28,32 @@ impl App {
         unsafe { process_command_line(self, CppString::from_c_str(cmd_line.as_ptr())) }
     }
 
+    #[call_engine(0x0054cc50, "cdecl")]
+    pub unsafe fn get() -> &'static mut App;
+
     #[call_engine(0x0054e000)]
-    pub unsafe fn update(&self);
+    pub unsafe fn update(&mut self);
 
     #[call_engine(0x05578b0)]
-    pub unsafe fn init_config_files(&self) -> bool;
+    pub unsafe fn init_config_files(&mut self) -> bool;
 
     #[call_engine(0x0054f210)]
-    pub unsafe fn init_localization(&self) -> bool;
+    pub unsafe fn init_localization(&mut self) -> bool;
 
     #[call_engine(0x0041d270)]
     pub unsafe fn get_input_manager(&self) -> *mut InputManager;
+
+    #[call_engine(0x0054e8d0)]
+    pub unsafe fn window_has_moved(&mut self);
+
+    #[call_engine(0x0054e8e0)]
+    pub unsafe fn window_has_resized(&mut self);
+
+    #[call_engine(0x00557fa0)]
+    pub unsafe fn is_full_screen(&self) -> bool;
+
+    #[call_engine(0x0054ec50)]
+    pub unsafe fn toggle_full_screen_mode(&mut self) -> bool;
 }
 
 pub unsafe fn inject_calls() {
