@@ -1,0 +1,22 @@
+// Parses the ".cfg" file which is a collection of key-value pairs separated by 
+// newlines.
+// Newlines can be included in the key or value string if surrounded by quotes.
+//
+// Example: 
+//
+// "Exported Creatures Directory" "My Creatures"
+// "Display Type" 2
+// LanguageCLibrary english-uk
+// Language en-GB
+//
+quote_string = _{ "\"" ~ string ~ "\"" }
+string = @{ char+ }
+char = _{ !"\"" ~ ASCII }
+
+naked_single = { !space ~ !NEWLINE ~ char }
+whole_word = @{ naked_single+ }
+
+space = _{ " "+ }
+field = _{ quote_string | whole_word }
+record = { field ~ space ~ field }
+file = _{ SOI ~ ((record ~ NEWLINE) | record)* ~ EOI }

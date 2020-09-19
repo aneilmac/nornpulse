@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod app;
+pub mod configurator;
 pub mod creature_history;
 pub mod directory_manager;
 pub mod flight_recorder;

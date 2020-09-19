@@ -1,12 +1,14 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
 use syn::token::Comma;
 use syn::{
-    parenthesized, parse_macro_input, Attribute, FnArg, Ident, LitInt, LitStr, ReturnType, Token, Visibility,
+    parenthesized, parse_macro_input, Attribute, FnArg, Ident, LitInt, LitStr, ReturnType, Token,
+    Visibility,
 };
+use syn::spanned::Spanned;
 
 struct EngineSig {
     attrs: Vec<Attribute>,
@@ -135,8 +137,7 @@ pub fn call_engine(address_attrs: TokenStream, item: TokenStream) -> TokenStream
     };
 
     let expanded = quote! {
-      #(#attrs)
-* 
+      #(#attrs)*
       #vis unsafe fn #ident(#inputs) #output
       {
         type F = unsafe extern #conventions fn(#arg_types) #output;
@@ -145,4 +146,48 @@ pub fn call_engine(address_attrs: TokenStream, item: TokenStream) -> TokenStream
       }
     };
     expanded.into()
+}
+
+#[proc_macro_derive(CheckStructAlign, attributes(check_align))]
+pub fn check_struct_align(item: TokenStream) -> TokenStream {
+    // Parse the inputstream as a struct declaration.
+    let strukt: syn::ItemStruct = parse_macro_input!(item);
+
+    // Collect all our fields + an optional Integer that
+    // may be associated with the given field in case where
+    // alignment must be forced with `check_align`.
+    let fields: Vec<_> = strukt
+        .fields
+        .iter()
+        .map(|f| {
+            (
+                f,
+                f.attrs
+                    .iter()
+                    .find(|a| "check_align" == a.path.to_token_stream().to_string())
+                    .map(|a| a.parse_args::<LitInt>().unwrap()),
+            )
+        })
+        .collect();
+
+    // Generate all our assert statements for each given `check_align`.
+    let asserts = fields.iter().enumerate().filter_map(|(index, vy)| match vy {
+        (field, Some(alignment)) => {
+            // Collection of all types up to and excluding the current field.
+            let types = fields.iter().take(index).map(|(f, ..)| &f.ty);
+            // Seems to be how `const_assert` does it. Here we add the sizes
+            // of types and test to see if it matches the "forced" given value.
+            // I.E does: `sizeof<i32> + sizeof<f32> + sizeof<bool> == 9`
+            // On failures we get a compile time error. We don't get good
+            // error messages, but that's okay for our purposes.
+            Some(quote_spanned! {field.span()=>
+                const _: [(); 0 - !{ const ASSERT: bool = (#(std::mem::size_of::<#types>() +)* 0) == #alignment; ASSERT } as usize] = [];
+            })
+        }
+        _ => None,
+    });
+
+    // Insert our asserts after our struct.
+    let output = quote! { #(#asserts)* };
+    output.into()
 }
