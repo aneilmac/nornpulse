@@ -104,7 +104,6 @@ impl std::fmt::Debug for FFILifeEvent {
     }
 }
 
-
 pub unsafe fn inject_calls() {
     use injected_calls::*;
     // Creature History

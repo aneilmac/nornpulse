@@ -3,7 +3,6 @@ use crate::engine::directory_manager::DirectoryManager;
 use crate::windowing::icon;
 use crate::windowing::input_convert::{keycode_to_vk_keycode, map_mouse_btn};
 use callengine::call_engine;
-use std::ffi::CStr;
 use winapi::shared::windef::HWND;
 
 mod global {
@@ -21,25 +20,17 @@ struct TickGameStepEvent {}
 static mut EVENT_PENDING: bool = false;
 static mut EVENT_SUBSYSTEM: *const sdl2::EventSubsystem = std::ptr::null();
 
-pub fn startup(cmd_line: &CStr) -> Result<(), String> {
+pub fn startup(cmd_line: &str) -> Result<(), String> {
     unsafe {
         *global::GAME_RUNNING = true;
     }
 
-    log::debug!("Processing command line.");
-    let success = unsafe { App::get().process_command_line(cmd_line) };
-    if !success {
-        return Err(String::from(
-            "Could not parse command-line arguments. Aborting",
-        ));
-    }
-
+    App::get().process_command_line(cmd_line);
     init_app()?;
 
     log::debug!("Setting up SDL2.");
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
-
 
     let _window = init_sdl2_window(&video_subsystem)?;
     sdl_context.mouse().show_cursor(false);
@@ -88,7 +79,8 @@ fn init_sdl2_window(video_subsystem: &sdl2::VideoSubsystem) -> Result<sdl2::vide
     let mut window = window.unwrap();
     window.set_icon(icon::ds_icon_bmp());
 
-    unsafe { // TODO: Remove. We don't want a global HWND variable.
+    unsafe {
+        // TODO: Remove. We don't want a global HWND variable.
         let mut info = std::mem::zeroed();
         sdl2_sys::SDL_GetWindowWMInfo(window.raw(), &mut info);
         assert_eq!(info.subsystem, sdl2_sys::SDL_SYSWM_TYPE::SDL_SYSWM_WINDOWS);
@@ -119,34 +111,31 @@ fn init_app() -> Result<(), String> {
     Ok(())
 }
 
-fn process_event(
-    event_subsystem: &sdl2::EventSubsystem,
-    event: sdl2::event::Event,
-) -> bool {
+fn process_event(event_subsystem: &sdl2::EventSubsystem, event: sdl2::event::Event) -> bool {
+    use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::keyboard::Mod;
     use sdl2::keyboard::Scancode;
-    use sdl2::event::Event;
 
     match event {
-        Event::MouseMotion { x, y, .. } => unsafe {
+        Event::MouseMotion { x, y, .. } => {
             App::get().input_manager.sys_add_mouse_move_event(x, y);
         },
         Event::MouseButtonDown {
             x, y, mouse_btn, ..
-        } => unsafe {
+        } => {
             App::get()
                 .input_manager
                 .sys_add_mouse_down_event(x, y, map_mouse_btn(mouse_btn));
         },
         Event::MouseButtonUp {
             x, y, mouse_btn, ..
-        } => unsafe {
+        } => {
             App::get()
                 .input_manager
                 .sys_add_mouse_up_event(x, y, map_mouse_btn(mouse_btn));
         },
-        Event::MouseWheel { y, .. } => unsafe {
+        Event::MouseWheel { y, .. } => {
             App::get().input_manager.sys_add_mouse_wheel_event(0, 0, y);
         },
         Event::Window { win_event, .. } => {
@@ -176,7 +165,7 @@ fn process_event(
                 repeat: false,
             });
         }
-        Event::KeyDown { keycode, .. } => unsafe {
+        Event::KeyDown { keycode, .. } => {
             // TODO Break Key. (CTRL+PAUSE). Shows a dialog saying
             // "This will quit creatures without saving." On yes the game
             // quits. Otherwise no-op.
@@ -190,25 +179,32 @@ fn process_event(
                 Some(k) => {
                     let vk_k = keycode_to_vk_keycode(k);
                     match vk_k {
-                    Some(v) => { 
-                        App::get().input_manager.sys_add_key_down_event(v);
+                        Some(v) => {
+                            App::get().input_manager.sys_add_key_down_event(v);
 
-                        // TODO: input_manager handles this all
-                        // as a TextEdit event.
-                        if k == Keycode::Return || k == Keycode::Backspace || k == Keycode::Escape {
-                            App::get().input_manager.sys_add_translated_char_event(v);
+                            // TODO: input_manager handles this all
+                            // as a TextEdit event.
+                            if k == Keycode::Return
+                                || k == Keycode::Backspace
+                                || k == Keycode::Escape
+                            {
+                                App::get().input_manager.sys_add_translated_char_event(v);
+                            }
                         }
-                    },
-                    None => log::debug!("Unknown key: {:?}", keycode),
+                        None => log::debug!("Unknown key: {:?}", keycode),
                     }
                 }
                 None => (),
             }
         },
-        Event::KeyUp { keycode: Some(Keycode::Return), keymod: Mod::LALTMOD, .. } => unsafe {
-                App::get().toggle_full_screen_mode();
+        Event::KeyUp {
+            keycode: Some(Keycode::Return),
+            keymod: Mod::LALTMOD,
+            ..
+        } => unsafe {
+            App::get().toggle_full_screen_mode();
         },
-        Event::KeyUp { keycode, .. } => unsafe {
+        Event::KeyUp { keycode, .. } => {
             match keycode {
                 Some(k) => {
                     App::get().input_manager.sys_add_key_up_event(k as i32);
@@ -216,19 +212,19 @@ fn process_event(
                 None => (),
             }
         },
-        Event::TextInput { text, .. } => unsafe {
+        Event::TextInput { text, .. } => {
             for c in text.chars() {
                 // 2 is big enough to encode any char as u16.
                 let mut char_buffer: [u16; 2] = Default::default();
                 let slice = c.encode_utf16(&mut char_buffer);
                 for c16 in slice {
                     App::get()
-                    .input_manager
-                    .sys_add_translated_char_event(*c16 as i32);
+                        .input_manager
+                        .sys_add_translated_char_event(*c16 as i32);
                 }
             }
         },
-        Event::User{ .. } => {
+        Event::User { .. } => {
             let tick_event = event.as_user_event_type::<TickGameStepEvent>();
             match tick_event {
                 Some(_) => return do_app_update(),
@@ -236,7 +232,7 @@ fn process_event(
             }
         }
         // TODO 0x402 codes.
-        _ => log::debug!("Uncaptured event: {:?}", event)
+        _ => log::debug!("Uncaptured event: {:?}", event),
     }
     true
 }
@@ -268,8 +264,7 @@ mod injected_calls {
     pub unsafe extern "stdcall" fn trigger_game_step() {
         if !EVENT_PENDING {
             EVENT_PENDING = true;
-            let _ = (*EVENT_SUBSYSTEM).push_custom_event(TickGameStepEvent{});
+            let _ = (*EVENT_SUBSYSTEM).push_custom_event(TickGameStepEvent {});
         }
     }
 }
-

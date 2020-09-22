@@ -40,8 +40,8 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x00557560, get_initialisation_functions);
     // replace_call!(0x0041d270, get_input_manager);
     // replace_call!(0x00557c40, get_is_screen_saver_preview);
-    // replace_call!(0x0054ef50, get_lang_catalogue_preview);
-    // replace_call!(0x0054ec90, get_lang_c_lib);
+    replace_call!(0x0054ef50, get_lang_catalogue);
+    replace_call!(0x0054ec90, get_lang_c_lib);
     // replace_call!(0x0041d590, get_last_tick_gap);
     // replace_call!(0x0041d1c0, get_line_plane);
     // replace_call!(0x0041d250, get_maximum_distance_before_port_line_snaps);
@@ -60,7 +60,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x0041d230, which_creature_permission_to_highlight);
     // replace_call!(0x0041d260, get_world);
     // replace_call!(0x005577e0, get_world_name);
-    // replace_call!(0x00557c00, get_world_tick_interval);
+    replace_call!(0x00557c00, get_world_tick_interval);
     // replace_call!(0x0054f970, handle_input);
     // replace_call!(0x0054d210, init);
     // replace_call!(0x005578b0, init_config_files);
@@ -70,7 +70,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x0054e8f0, _internal_window_has_resized);
     // replace_call!(0x00557c20, is_app_a_screensaver);
     // replace_call!(0x00557fa0, is_app_full_screen);
-    // replace_call!(0x0041d5c0, machine_settings);
+    //replace_call!(0x0041d5c0, machine_settings);
     // replace_call!(0x00557170, notify_new_nickname);
     // replace_call!(0x0041d540, play_all_sounds_at_maximum_level);
     // replace_call!(0x005511f0, process_command_line);
@@ -81,7 +81,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x0054e930, set_up_sound);
     // replace_call!(0x0041d210, set_whether_we_should_highlight_agents_known_to_creature);
     // replace_call!(0x0041d220, set_which_creature_permission_to_highlight);
-    // replace_call!(0x00557c10, set_world_tick_interval);
+    replace_call!(0x00557c10, set_world_tick_interval);
     // replace_call!(0x0041d200, should_highlight_agents_known_to_creature);
     // replace_call!(0x0041d1e0, should_skeletons_animate_double_speed);
     // replace_call!(0x0041d1f0, set_should_skeletons_animate_double_speed);
@@ -92,7 +92,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x0041d550, toggle_midi);
     // replace_call!(0x0054e000, update_app);
     // replace_call!(0x00550a90, update_progress_bar);
-    // replace_call!(0x0041d5b0, user_settings);
+    //replace_call!(0x0041d5b0, user_settings);
     // replace_call!(0x0054e8d0, window_has_moved);
     // replace_call!(0x0054e8e0, window_has_resized);
 }
@@ -144,11 +144,11 @@ extern "thiscall" fn check_for_cd(_app: &App) -> bool {
 // }
 
 // extern "thiscall" fn debug_key_now(app: &mut App) -> bool {
-    
+
 // }
 
 // extern "thiscall" fn debug_key_now_no_shift(app: &mut App) -> bool {
-    
+
 // }
 
 // extern "thiscall" fn delete_eame_var(app: &mut App, var_name: CppString) {
@@ -223,11 +223,19 @@ extern "thiscall" fn check_for_cd(_app: &App) -> bool {
 // extern "thiscall" fn get_is_screen_saver_preview(app: &App) -> bool {
 // }
 
-// extern "thiscall" fn get_lang_catalogue_preview(app: &mut App) -> String {
-// }
+extern "thiscall" fn get_lang_catalogue(app: &mut App, out: *mut CppString) ->  *mut CppString {
+    let s = app.lang_catalogue();
+    let s = CppString::from(s);
+    unsafe { std::ptr::write(out, s); }
+    out
+}
 
-// extern "thiscall" fn get_lang_c_lib(app: &mut App) -> String {
-// }
+extern "thiscall" fn get_lang_c_lib(app: &mut App, out: *mut CppString) ->  *mut CppString {
+    let s = app.lang_c_lib();
+    let s = CppString::from(s);
+    unsafe { std::ptr::write(out, s); }
+    out
+}
 
 // extern "thiscall" fn get_last_tick_gap(app: &App) -> int {
 // }
@@ -284,9 +292,9 @@ extern "cdecl" fn get_the_app() -> &'static mut App {
 // extern "thiscall" fn get_world_name(app: &App) -> String {
 // }
 
-// extern "cdecl" fn get_world_tick_interval() -> i32 {
-//     App::get_world_tick_interval()
-// }
+extern "cdecl" fn get_world_tick_interval() -> i32 {
+    App::world_tick_interval()
+}
 
 // extern "thiscall" fn handle_input(app: &mut App) {
 // }
@@ -315,7 +323,8 @@ extern "cdecl" fn get_the_app() -> &'static mut App {
 // extern "thiscall" fn is_app_full_screen(app: &App) -> bool {
 // }
 
-// extern "thiscall" fn machine_settings(app: &App) -> &Configurator {
+// extern "thiscall" fn machine_settings(app: &mut App) -> &mut Configurator {
+//     &mut app.machine_settings
 // }
 
 // extern "thiscall" fn notify_new_nickname(app: &App, nickname: CppString) {
@@ -348,8 +357,9 @@ extern "cdecl" fn get_the_app() -> &'static mut App {
 // extern "thiscall" fn set_which_creature_permission_to_highlight(app: &mut App, permission: i32) {
 // }
 
-// extern "cdecl" fn set_world_tick_interval(tick: i32) {
-// }
+extern "cdecl" fn set_world_tick_interval(tick: i32) {
+    App::set_world_tick_interval(tick)
+}
 
 // extern "thiscall" fn should_highlight_agents_known_to_creature(app: &App) -> bool {
 // }
@@ -381,7 +391,8 @@ extern "cdecl" fn get_the_app() -> &'static mut App {
 // extern "thiscall" fn update_progress_bar(app: &mut App, progress: i32) {
 // }
 
-// extern "thiscall" fn user_settings(app: &App) -> &Configurator {
+// extern "thiscall" fn user_settings(app: &mut App) -> &mut Configurator {
+//     &app.user_settings
 // }
 
 // extern "thiscall" fn window_has_moved(app: &App) -> bool {

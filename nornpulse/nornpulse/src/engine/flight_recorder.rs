@@ -3,7 +3,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-
+use callengine::call_engine;
 use c2ers::flight_recorder as cf;
 
 #[derive(FromPrimitive)]
@@ -42,10 +42,16 @@ mod injected_calls {
         recorder_ptr: *mut cf::FlightRecorder,
         flight_category: u32,
         message: *const c_char,
-        _args: ...
+        args: ...
     ) {
-        let message = CStr::from_ptr(message);
+        // v is used as a raw allocated memory block.
+        let mut v = Vec::<i8>::with_capacity(4096);
+        let vsprintf = get_vsprintf();
+        vsprintf(v.as_mut_ptr(), message, args);
+
+        let message = CStr::from_ptr(v.as_ptr());
         let message: &str = message.to_str().unwrap();
+
         (*recorder_ptr).log(
             &log::Record::builder()
                 .args(format_args!("({}) {}", flight_category, message))
@@ -70,4 +76,15 @@ mod injected_calls {
             "FlightRecorder::SetCategories called. Ignored."
         );
     }
+}
+
+type SprintfFN =  unsafe extern "C" fn(*mut c_char, *const c_char, ...);
+
+/// The darkest of dark arts. From the lookup table grab vsprintf from
+///  MSVCRT.dll. There is probably not an unsafer function in existence.
+unsafe fn get_vsprintf() -> SprintfFN
+{
+    type FF = *const SprintfFN;
+    let op_address : FF = std::mem::transmute(0x0062fc40);
+    *op_address 
 }

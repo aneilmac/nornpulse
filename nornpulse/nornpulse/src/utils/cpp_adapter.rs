@@ -1,5 +1,5 @@
-use std::os::raw::c_char;
 use callengine::call_engine;
+use std::os::raw::c_char;
 
 /// Calls C++'s `delete` upon the given pointer. Segfaults will
 /// trigger if applied to any pointer than those allocated by `operator_new`.
@@ -13,9 +13,9 @@ unsafe fn operator_delete(ptr: *mut libc::c_void);
 unsafe fn operator_new(size: usize) -> *mut libc::c_void;
 
 /// Representation of a C++ string. Contains C++
-#[repr(C, packed)]
+#[repr(C)]
 pub struct CppString {
-    _unknown: [u8; 4],
+    allocator: u8,
     data: *const c_char,
     length: usize,
     capacity: usize,
@@ -30,12 +30,23 @@ impl std::fmt::Display for CppString {
             std::ptr::copy(self.data, str_copy.as_mut_ptr() as *mut i8, self.length);
         }
 
-        let wrapped_str =
-            std::ffi::CString::new(str_copy).expect("C++ String has invalid internal \\0.");
+        let len = str_copy
+        .iter()
+        .position(|c| *c == '\0' as u8)
+        .unwrap_or(str_copy.len());
 
-        let output = wrapped_str.to_str().expect("C++ String has invalid UTF8.");
+        str_copy.truncate(len);
 
-        write!(f, "{}", output)
+        let wrapped_str = std::ffi::CString::new(str_copy).unwrap();
+        let output = wrapped_str.to_str();
+        match output {
+            Ok(s) =>  write!(f, "{}", s),
+            Err(utf8_err) => {
+                log::error!("{:?}", utf8_err);
+                write!(f, "[[C++ String has invalid UTF8.]]", )
+            }
+        }
+       
     }
 }
 
@@ -45,11 +56,48 @@ impl std::fmt::Debug for CppString {
     }
 }
 
+impl Into<String> for CppString {
+    fn into(self) -> String {
+        self.to_string()
+    }
+}
+
+impl From<String> for CppString {
+    fn from(string: String) -> Self {
+        let string = string.into_bytes();
+        let len = string.len();
+
+        if len == 0 {
+            return CppString::empty();
+        } else {
+            unsafe {
+                let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
+
+                std::ptr::copy_nonoverlapping(
+                    string.as_ptr() as *const i8,
+                    cpp_str_ptr.offset(1),
+                    len,
+                );
+
+                // COW ref-count.
+                *cpp_str_ptr = 0;
+                // Null terminate string.
+                *cpp_str_ptr.offset((len+1) as isize) = 0;
+
+                CppString {
+                    allocator: 0,
+                    data: cpp_str_ptr.offset(1),
+                    length: len,
+                    capacity: len,
+                }
+            }
+        }
+    }
+}
+
 impl Drop for CppString {
     fn drop(&mut self) {
-        self.length = 0;
-        self.capacity = 0;
-        if self.data != std::ptr::null() {
+        if !self.data.is_null() {
             unsafe {
                 // Pre C++11 Strings are COW. In this particular implementation there is
                 // one extra char allocated at the start of the string used for
@@ -62,6 +110,8 @@ impl Drop for CppString {
                     *(start_ptr) -= 1;
                 }
             }
+            self.length = 0;
+            self.capacity = 0;
             self.data = std::ptr::null();
         }
     }
@@ -69,7 +119,9 @@ impl Drop for CppString {
 
 impl Clone for CppString {
     fn clone(&self) -> Self {
-        unsafe { CppString::from_c_str(self.data) }
+        let mut s = unsafe { CppString::from_c_str(self.data) };
+        s.allocator = self.allocator;
+        s
     }
 }
 
@@ -78,11 +130,11 @@ impl CppString {
         let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
         let len = c_str.to_bytes().len();
         let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
-         // length + null terminator.
+        // length + null terminator.
         std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
         *cpp_str_ptr = 0; // Ref count.
         CppString {
-            _unknown: [0, 0, 0, 0],
+            allocator: 0,
             data: cpp_str_ptr,
             length: len,
             capacity: len,
@@ -91,7 +143,7 @@ impl CppString {
 
     pub const fn empty() -> Self {
         CppString {
-            _unknown: [0, 0, 0, 0],
+            allocator: 0,
             data: std::ptr::null(),
             length: 0,
             capacity: 0,
@@ -99,10 +151,9 @@ impl CppString {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct CppVector<T> {
     _allocator: u8,
-    _padding: [u8;3],
     start_ptr: *mut T,
     length_end_ptr: *mut T,
     capacity_end_ptr: *mut T,
@@ -112,8 +163,7 @@ impl<T> CppVector<T> {
     pub const fn empty() -> Self {
         Self {
             _allocator: 104, // Always seems to be the value for raw allocator.
-            _padding: [0, 0, 0],
-            start_ptr: std:: ptr::null_mut(),
+            start_ptr: std::ptr::null_mut(),
             length_end_ptr: std::ptr::null_mut(),
             capacity_end_ptr: std::ptr::null_mut(),
         }
@@ -128,12 +178,16 @@ impl<T> CppVector<T> {
             0
         } else {
             let k = self.length_end_ptr as i32 - self.start_ptr as i32;
-            if k < 0 { 0 } else { k as usize }
+            if k < 0 {
+                0
+            } else {
+                k as usize
+            }
         }
     }
 
     pub fn len(&self) -> usize {
-        self.len_bytes() /  std::mem::size_of::<T>()
+        self.len_bytes() / std::mem::size_of::<T>()
     }
 
     pub fn push(&mut self, val: T) {
@@ -168,7 +222,7 @@ impl<T> core::ops::Index<usize> for CppVector<T> {
 
 impl<T> core::ops::IndexMut<usize> for CppVector<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        unsafe { &mut(*self.start_ptr.offset(index as isize)) }
+        unsafe { &mut (*self.start_ptr.offset(index as isize)) }
     }
 }
 
@@ -184,10 +238,9 @@ impl<T> Clone for CppVector<T> {
         }
         Self {
             _allocator: self._allocator,
-            _padding: self._padding,
             start_ptr: start_ptr,
             length_end_ptr: end_ptr,
-            capacity_end_ptr: end_ptr
+            capacity_end_ptr: end_ptr,
         }
     }
 }
@@ -197,7 +250,7 @@ impl<T: Copy> Into<Vec<T>> for CppVector<T> {
         let mut v = Vec::with_capacity(self.len());
         let mut current = self.start_ptr;
         while current != self.length_end_ptr {
-            unsafe { 
+            unsafe {
                 v.push(std::ptr::read_unaligned(current));
                 current = current.offset(1);
             }
@@ -208,16 +261,18 @@ impl<T: Copy> Into<Vec<T>> for CppVector<T> {
 
 impl<T> Drop for CppVector<T> {
     fn drop(&mut self) {
-        unsafe { operator_delete(self.start_ptr as *mut libc::c_void); }
-        self.start_ptr =  std::ptr::null_mut();
-        self.capacity_end_ptr =  std::ptr::null_mut();
-        self.length_end_ptr =  std::ptr::null_mut();
+        unsafe {
+            operator_delete(self.start_ptr as *mut libc::c_void);
+        }
+        self.start_ptr = std::ptr::null_mut();
+        self.capacity_end_ptr = std::ptr::null_mut();
+        self.length_end_ptr = std::ptr::null_mut();
     }
 }
 
 impl<T: Copy + std::fmt::Debug> std::fmt::Debug for CppVector<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let v : Vec<T> = self.clone().into();
+        let v: Vec<T> = self.clone().into();
         std::fmt::Debug::fmt(&v, f)
     }
 }

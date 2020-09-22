@@ -3,12 +3,12 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::parse::{Parse, ParseStream, Result};
 use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
     parenthesized, parse_macro_input, Attribute, FnArg, Ident, LitInt, LitStr, ReturnType, Token,
     Visibility,
 };
-use syn::spanned::Spanned;
 
 struct EngineSig {
     attrs: Vec<Attribute>,

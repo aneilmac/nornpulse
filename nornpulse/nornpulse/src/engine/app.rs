@@ -1,64 +1,163 @@
-use crate::utils::cpp_adapter::{CppString, CppVector};
 use crate::engine::configurator::Configurator;
 use crate::engine::input_manager::InputManager;
-use std::ffi::CStr;
+use crate::utils::cpp_adapter::{CppString, CppVector};
 use callengine::{call_engine, CheckStructAlign};
+use std::ffi::CStr;
 
 mod injected_calls;
 
 static mut C_CALLED: bool = false;
-
+static mut WORLD_TICK_INTERVAL: i32 = 0x32;
 static mut APP: std::mem::MaybeUninit<App> = std::mem::MaybeUninit::uninit();
 
 #[repr(C, packed)]
-#[derive(CheckStructAlign)]
-#[derive(Debug)]
+#[derive(CheckStructAlign, Debug)]
 pub struct App {
-    #[check_align(0)] _unknown1: [u8; 4],
-    #[check_align(4)] current_loading_scene_name: CppString,
-    #[check_align(20)] pub terminate_triggered: bool,
-    _padding1: [u8;7],
-    #[check_align(28)] pub aa: CppVector<u8>,
-    #[check_align(44)] pub bb: CppVector<u8>,
-    #[check_align(60)] pub preview_window_handle: usize,
-    #[check_align(64)] pub is_screen_saver_preview: bool,
-    #[check_align(65)] pub screen_saver_config_flag: bool,
-    #[check_align(66)] pub is_app_screensaver: bool,
-    _padding2: [u8;1],
-    #[check_align(68)] pub user_settings: Configurator,
-    #[check_align(108)] pub machine_settings: Configurator,
-    #[check_align(148)] pub internal_window_has_resized: bool,
-    #[check_align(149)] pub internal_window_has_moved: bool,
-    #[check_align(150)] pub display_settings_error_next_tick: bool,
-    #[check_align(151)] pub window_has_resized: bool,
-    #[check_align(152)] pub window_has_moved: bool,
-    #[check_align(153)] pub should_skeletons_animate_double_speed: bool,
-    #[check_align(154)] pub whether_we_should_highlight_agents_known_to_creature: bool,
-    _padding3: [u8;1],
-    #[check_align(156)] pub which_creaure_permission_to_highlight: i32,
-    #[check_align(160)] pub line_plane: i32,
-    #[check_align(164)] pub creature_pickup_status: i32,
-    #[check_align(168)] pub only_play_midi_music_flag: bool,
-    _padding4: [u8;3],
-    #[check_align(172)] pub h_cursor: usize,
-    #[check_align(176)] pub handle: usize,
-    #[check_align(180)] pub world: usize,
-    #[check_align(184)] pub input_manager: InputManager,
-    #[check_align(248)] _unknown3: [u8;4],
-    #[check_align(252)] game_name: CppString,
-    #[check_align(268)] system_tick: u32,
-    #[check_align(272)] _unknown5: [u8;4],
-    #[check_align(276)] play_all_sounds_at_maximum_level_flag: bool,
-    #[check_align(277)] autokill_agent_on_error_flag: bool,
-    #[check_align(278)] _unknown6: [u8;22],
-    #[check_align(300)] password: CppString,
-    #[check_align(316)] _unknown7: [u8;3],
-    #[check_align(319)] fastest_ticks: bool,
-    #[check_align(320)] maximum_distance_before_port_line_warns: f32,
-    #[check_align(324)] maximum_distance_before_port_line_snaps: f32,
-    #[check_align(328)] _unknown8: [u8;4],
-    #[check_align(332)] last_tick_gap: i32,
-    _padding5: [u8;12],
+    _unknown1: [u8; 4],
+
+    #[check_align(4)]
+    current_loading_scene_name: CppString,
+
+    #[check_align(20)]
+    pub terminate_triggered: bool,
+
+    #[check_align(21)]
+    _unused_field_0: bool,
+
+    _padding1: [u8; 2],
+
+    #[check_align(24)]
+    pub unknown_flag_storage: i32,
+
+    #[check_align(28)]
+    pub aa: CppVector<u8>,
+
+    #[check_align(44)]
+    pub bb: CppVector<u8>,
+
+    #[check_align(60)]
+    pub preview_window_handle: usize,
+
+    #[check_align(64)]
+    pub is_screen_saver_preview: bool,
+
+    #[check_align(65)]
+    pub screen_saver_config_flag: bool,
+
+    #[check_align(66)]
+    pub is_app_screensaver: bool,
+
+    _padding2: [u8; 1],
+
+    #[check_align(68)]
+    pub user_settings: Configurator,
+
+    _padding6: [u8; 28],
+
+    #[check_align(108)]
+    pub machine_settings: Configurator,
+
+    _padding7: [u8; 28],
+
+    // #[check_align(68)] pub user_settings_a: [u8;20],
+    // pub user_settings_b: [u8;20],
+    // #[check_align(108)] pub machine_settings_a: [u8;20],
+    // pub machine_settings_b: [u8;20],
+    
+    #[check_align(148)]
+    pub internal_window_has_resized: bool,
+
+    #[check_align(149)]
+    pub internal_window_has_moved: bool,
+
+    #[check_align(150)]
+    pub display_settings_error_next_tick: bool,
+
+    #[check_align(151)]
+    pub window_has_resized: bool,
+
+    #[check_align(152)]
+    pub window_has_moved: bool,
+
+    #[check_align(153)]
+    pub should_skeletons_animate_double_speed: bool,
+
+    #[check_align(154)]
+    pub whether_we_should_highlight_agents_known_to_creature: bool,
+
+    _padding3: [u8; 1],
+
+    #[check_align(156)]
+    pub which_creaure_permission_to_highlight: i32,
+
+    #[check_align(160)]
+    pub line_plane: i32,
+
+    #[check_align(164)]
+    pub creature_pickup_status: i32,
+
+    #[check_align(168)]
+    pub only_play_midi_music_flag: bool,
+    _padding4: [u8; 3],
+
+    #[check_align(172)]
+    pub h_cursor: usize,
+
+    #[check_align(176)]
+    pub handle: usize,
+
+    #[check_align(180)]
+    pub world: usize,
+
+    #[check_align(184)]
+    pub input_manager: InputManager,
+
+    _unknown3: [u8; 4],
+
+    #[check_align(252)]
+    game_name: CppString,
+
+    #[check_align(268)]
+    system_tick: u32,
+
+    #[check_align(272)]
+    unknown_progress_bar: i32,
+
+    #[check_align(276)]
+    play_all_sounds_at_maximum_level_flag: bool,
+
+    #[check_align(277)]
+    autokill_agent_on_error_flag: bool,
+
+    _unknown6: [u8; 22],
+
+    #[check_align(300)]
+    password: CppString,
+
+    #[check_align(316)]
+    do_i_need_to_get_password: bool,
+
+    #[check_align(317)]
+    display_rendering: bool,
+
+    #[check_align(318)]
+    refresh_display_at_end_of_tick: bool,
+
+    #[check_align(319)]
+    fastest_ticks: bool,
+
+    #[check_align(320)]
+    maximum_distance_before_port_line_warns: f32,
+
+    #[check_align(324)]
+    maximum_distance_before_port_line_snaps: f32,
+
+    _unknown8: [u8; 4],
+
+    #[check_align(332)]
+    last_tick_gap: i32,
+
+    _padding5: [u8; 12],
 }
 
 impl App {
@@ -68,8 +167,88 @@ impl App {
     // pub fn add_initalisation_function() -> undefined4 {
     // }
 
-    // pub fn new() -> Self {
-    // }
+    pub fn new() -> Self {
+        Self {
+            _unknown1: Default::default(),
+            current_loading_scene_name: CppString::empty(),
+            terminate_triggered: false,
+            _unused_field_0: false,
+            _padding1: Default::default(),
+            unknown_flag_storage: 0xf,
+            aa: {
+                let mut aa = CppVector::<u8>::empty();
+                aa.push(0x1);
+                aa.push(0x2);
+                aa.push(0x4);
+                aa.push(0x8);
+                aa.push(0x10);
+                aa.push(0x20);
+                aa.push(0x40);
+                aa
+            },
+            bb: {
+                let mut bb = CppVector::<u8>::empty();
+                bb.push(0x0);
+                bb.push(0x1);
+                bb.push(0x2);
+                bb.push(0x8);
+                bb.push(0x10);
+                bb.push(0x20);
+                bb
+            },
+            preview_window_handle: 0,
+            is_screen_saver_preview: false,
+            screen_saver_config_flag: false,
+            is_app_screensaver: false,
+            _padding2: Default::default(),
+
+            user_settings: Configurator::new(),
+            _padding6: Default::default(),
+            machine_settings: Configurator::new(),
+            _padding7: Default::default(),
+
+            // user_settings_a: Default::default(),
+            // user_settings_b: Default::default(),
+            // machine_settings_a: Default::default(),
+            // machine_settings_b: Default::default(),
+
+
+            internal_window_has_resized: false,
+            internal_window_has_moved: false,
+            display_settings_error_next_tick: false,
+            window_has_resized: false,
+            window_has_moved: false,
+            should_skeletons_animate_double_speed: false,
+            whether_we_should_highlight_agents_known_to_creature: false,
+            _padding3: Default::default(),
+            which_creaure_permission_to_highlight: 0,
+            line_plane: 0x270e,
+            creature_pickup_status: 0,
+            only_play_midi_music_flag: false,
+            _padding4: Default::default(),
+            h_cursor: 0,
+            handle: 0,
+            world: 0,
+            input_manager: InputManager::new(),
+            _unknown3: Default::default(),
+            game_name: CppString::empty(),
+            system_tick: 0,
+            unknown_progress_bar: 0,
+            play_all_sounds_at_maximum_level_flag: false,
+            autokill_agent_on_error_flag: false,
+            _unknown6: Default::default(),
+            password: CppString::empty(),
+            do_i_need_to_get_password: false,
+            display_rendering: true,
+            refresh_display_at_end_of_tick: false,
+            fastest_ticks: false,
+            maximum_distance_before_port_line_warns: 600.0,
+            maximum_distance_before_port_line_snaps: 800.0,
+            _unknown8: Default::default(),
+            last_tick_gap: -1,
+            _padding5: Default::default(),
+        }
+    }
 
     // pub fn auto_kill_agents_on_error(&self) -> bool {
     // }
@@ -181,11 +360,22 @@ impl App {
     // pub fn get_is_screen_saver_preview(&self) -> bool {
     // }
 
-    // pub fn get_lang_catalogue_preview(&mut self) -> String {
-    // }
+    fn _key_from_lang_cfg(&self, key: &str, default: &str) -> String {
+        let  language_config = Configurator::from("language.cfg");
+        language_config
+            .get(key)
+            .or(self.user_settings.get(key))
+            .map(|s| s.clone())
+            .unwrap_or(String::from(default))
+    }
 
-    // pub fn get_lang_c_lib(&mut self) -> String {
-    // }
+    pub fn lang_catalogue(&self) -> String {
+        self._key_from_lang_cfg("Language", "en")
+    }
+
+    pub fn lang_c_lib(&self) -> String {
+        self._key_from_lang_cfg("LanguageCLibrary", "english")
+    }
 
     // pub fn get_last_tick_gap(&self) -> int {
     // }
@@ -227,7 +417,13 @@ impl App {
         unsafe {
             if !C_CALLED {
                 log::debug!("App Construction called");
+                //APP = std::mem::MaybeUninit::new(App::new());
+                
                 app_constructor(APP.get_mut());
+
+                std::ptr::write(&mut APP.get_mut().user_settings, Configurator::new());
+                std::ptr::write(&mut APP.get_mut().machine_settings, Configurator::new());
+
                 C_CALLED = true;
             }
             APP.get_mut()
@@ -236,7 +432,7 @@ impl App {
 
     // pub fn get_tick_rate_factor(&self) -> float {
     // }
- 
+
     // pub fn get_warp_incoming_path(&self) -> String {
     // }
 
@@ -255,8 +451,8 @@ impl App {
     // pub fn get_world_name(&self) -> String {
     // }
 
-    pub fn get_world_tick_interval() -> i32 {
-        32
+    pub fn world_tick_interval() -> i32 {
+        unsafe { WORLD_TICK_INTERVAL }
     }
 
     // pub fn handle_input(&mut self) {
@@ -316,8 +512,11 @@ impl App {
     // pub fn set_which_creature_permission_to_highlight(&mut self, permission: i32) {
     // }
 
-    // pub fn set_world_tick_interval(&mut self, tick: i32) {
-    // }
+    pub fn set_world_tick_interval(tick: i32) {
+        unsafe {
+            WORLD_TICK_INTERVAL = tick;
+        }
+    }
 
     // pub fn should_highlight_agents_known_to_creature(&self) -> bool {
     // }
@@ -358,39 +557,42 @@ impl App {
     // pub fn window_has_moved(&self) -> bool {
     // }
 
-
-    pub fn process_command_line(&mut self, cmd_line: &CStr) -> bool {
-        type CommandLineFn = unsafe extern "thiscall" fn(app: &App, param1: CppString) -> bool;
-        const PROCESS_COMMAND_LINE: u32 = 0x005511f0;
-
-        let process_command_line: CommandLineFn =
-            unsafe { std::mem::transmute(PROCESS_COMMAND_LINE) };
-
-        unsafe { process_command_line(self, CppString::from_c_str(cmd_line.as_ptr())) }
+    pub fn process_command_line(&mut self, args: &str) {
+        if args == "--autokill" {
+            self.autokill_agent_on_error_flag = true;
+        }
     }
 
     #[call_engine(0x0054e000)]
+    #[rustfmt::skip]
     pub unsafe fn update(&mut self);
 
     #[call_engine(0x05578b0)]
+    #[rustfmt::skip]
     pub unsafe fn init_config_files(&mut self) -> bool;
 
     #[call_engine(0x0054f210)]
+    #[rustfmt::skip]
     pub unsafe fn init_localization(&mut self) -> bool;
 
     #[call_engine(0x0041d270)]
+    #[rustfmt::skip]
     pub unsafe fn get_input_manager(&self) -> *mut InputManager;
 
     #[call_engine(0x0054e8d0)]
+    #[rustfmt::skip]
     pub unsafe fn window_has_moved(&mut self);
 
     #[call_engine(0x0054e8e0)]
+    #[rustfmt::skip]
     pub unsafe fn window_has_resized(&mut self);
 
     #[call_engine(0x00557fa0)]
+    #[rustfmt::skip]
     pub unsafe fn is_full_screen(&self) -> bool;
 
     #[call_engine(0x0054ec50)]
+    #[rustfmt::skip]
     pub unsafe fn toggle_full_screen_mode(&mut self) -> bool;
 }
 
@@ -399,4 +601,4 @@ pub unsafe fn inject_calls() {
 }
 
 #[call_engine(0x0054cc60, "thiscall")]
-pub unsafe fn app_constructor(app: &mut App);
+unsafe fn app_constructor(app: &mut App);

@@ -9,9 +9,9 @@
 // LanguageCLibrary english-uk
 // Language en-GB
 //
-quote_string = _{ "\"" ~ string ~ "\"" }
-string = @{ char+ }
-char = _{ !"\"" ~ ASCII }
+quote_string = { "\"" ~ string ~ "\"" }
+string = _{ char+ }
+char = _{ !"\"" ~ ("\\\\" | "\\n" | "\\t" | "\\\"" | ASCII) }
 
 naked_single = { !space ~ !NEWLINE ~ char }
 whole_word = @{ naked_single+ }

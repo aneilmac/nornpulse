@@ -29,7 +29,7 @@
 			"type": "shell",
 			"command": "./engine.exe",
 			"windows": {
-				"command": "cmd /c engine.exe | Out-Host"
+				"command": "cmd /c \"engine.exe --autokill\" | Out-Host"
 			},
 			"options": {
 					"cwd": "${cwd}/Docking Station"

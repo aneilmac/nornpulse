@@ -1,5 +1,5 @@
-use std::mem;
 use c2ers::agents as ca;
+use std::mem;
 
 pub unsafe fn inject_calls() {
     use injected_calls::*;
@@ -47,12 +47,18 @@ mod injected_calls {
     }
 
     // C2E:0x0049c9b0
-    pub extern "thiscall" fn agenthandle_neq(this: &ca::AgentHandle, other: &ca::AgentHandle) -> bool {
+    pub extern "thiscall" fn agenthandle_neq(
+        this: &ca::AgentHandle,
+        other: &ca::AgentHandle,
+    ) -> bool {
         this != other
     }
 
     // C2E:0x0049c990
-    pub extern "thiscall" fn agenthandle_eq(this: &ca::AgentHandle, other: &ca::AgentHandle) -> bool {
+    pub extern "thiscall" fn agenthandle_eq(
+        this: &ca::AgentHandle,
+        other: &ca::AgentHandle,
+    ) -> bool {
         this == other
     }
 
