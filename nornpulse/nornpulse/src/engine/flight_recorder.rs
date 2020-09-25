@@ -1,10 +1,10 @@
+use c2ers::flight_recorder as cf;
+use callengine::call_engine;
 use log::Log;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use callengine::call_engine;
-use c2ers::flight_recorder as cf;
 
 #[derive(FromPrimitive)]
 #[repr(u32)]
@@ -78,13 +78,12 @@ mod injected_calls {
     }
 }
 
-type SprintfFN =  unsafe extern "C" fn(*mut c_char, *const c_char, ...);
+type SprintfFN = unsafe extern "C" fn(*mut c_char, *const c_char, ...);
 
 /// The darkest of dark arts. From the lookup table grab vsprintf from
 ///  MSVCRT.dll. There is probably not an unsafer function in existence.
-unsafe fn get_vsprintf() -> SprintfFN
-{
+unsafe fn get_vsprintf() -> SprintfFN {
     type FF = *const SprintfFN;
-    let op_address : FF = std::mem::transmute(0x0062fc40);
-    *op_address 
+    let op_address: FF = std::mem::transmute(0x0062fc40);
+    *op_address
 }

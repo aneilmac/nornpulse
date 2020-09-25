@@ -1,3 +1,4 @@
+use crate::utils::cpp_adapter::CppString;
 use callengine::call_engine;
 
 #[repr(C, packed)]
@@ -12,7 +13,15 @@ impl DirectoryManager {
         std::mem::transmute(0x0062df30)
     }
 
-    // pub unsafe fn directory() -> &'static mut DirectoryManager {
-    //     std::mem::transmute(0x0062df30)
-    // }
+    pub unsafe fn directory(&self, param: i32) -> String {
+        let mut s = CppString::empty();
+        type FF = extern "thiscall" fn(
+            this: &DirectoryManager,
+            s: *mut CppString,
+            i: i32,
+        ) -> *mut CppString;
+        let op_address: FF = std::mem::transmute(0x0055e1a0);
+        op_address(self, &mut s, param);
+        s.to_string()
+    }
 }

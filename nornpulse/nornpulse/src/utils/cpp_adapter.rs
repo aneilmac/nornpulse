@@ -31,22 +31,21 @@ impl std::fmt::Display for CppString {
         }
 
         let len = str_copy
-        .iter()
-        .position(|c| *c == '\0' as u8)
-        .unwrap_or(str_copy.len());
+            .iter()
+            .position(|c| *c == '\0' as u8)
+            .unwrap_or(str_copy.len());
 
         str_copy.truncate(len);
 
         let wrapped_str = std::ffi::CString::new(str_copy).unwrap();
         let output = wrapped_str.to_str();
         match output {
-            Ok(s) =>  write!(f, "{}", s),
+            Ok(s) => write!(f, "{}", s),
             Err(utf8_err) => {
                 log::error!("{:?}", utf8_err);
-                write!(f, "[[C++ String has invalid UTF8.]]", )
+                write!(f, "[[C++ String has invalid UTF8.]]",)
             }
         }
-       
     }
 }
 
@@ -82,7 +81,7 @@ impl From<String> for CppString {
                 // COW ref-count.
                 *cpp_str_ptr = 0;
                 // Null terminate string.
-                *cpp_str_ptr.offset((len+1) as isize) = 0;
+                *cpp_str_ptr.offset((len + 1) as isize) = 0;
 
                 CppString {
                     allocator: 0,

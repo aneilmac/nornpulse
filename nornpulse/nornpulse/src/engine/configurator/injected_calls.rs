@@ -14,17 +14,16 @@ pub unsafe fn inject_calls() {
     replace_call!(0x0041d050, configurator_destructor);
 }
 
-pub extern "thiscall" fn new_configurator(
-    dst: *mut Configurator,
-) -> *mut Configurator {
-    unsafe { std::ptr::write(dst, Configurator::new()); }
+pub extern "thiscall" fn new_configurator(dst: *mut Configurator) -> *mut Configurator {
+    unsafe {
+        std::ptr::write(dst, Configurator::new());
+    }
     dst
 }
 
-
 extern "thiscall" fn bind_to_file(configurator: &mut Configurator, file: &CppString) -> bool {
     let file = file.to_string();
-    let result = configurator.bind_to_file(file);
+    let result = configurator.bind_to_file(file.as_str());
     result.is_ok()
 }
 

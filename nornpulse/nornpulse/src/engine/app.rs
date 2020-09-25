@@ -1,8 +1,15 @@
+use crate::engine::caos_description::CAOSDescription;
+use crate::engine::caos_machine::CAOSMachine;
+use crate::engine::caos_var::CAOSVar;
 use crate::engine::configurator::Configurator;
+use crate::engine::directory_manager::DirectoryManager;
 use crate::engine::input_manager::InputManager;
+use crate::engine::main_camera::MainCamera;
+use crate::engine::module_importer::ModuleImporter;
+use crate::engine::pray_manager::PrayManager;
+use crate::engine::shared_gallery::SharedGallery;
 use crate::utils::cpp_adapter::{CppString, CppVector};
 use callengine::{call_engine, CheckStructAlign};
-use std::ffi::CStr;
 
 mod injected_calls;
 
@@ -59,11 +66,6 @@ pub struct App {
 
     _padding7: [u8; 28],
 
-    // #[check_align(68)] pub user_settings_a: [u8;20],
-    // pub user_settings_b: [u8;20],
-    // #[check_align(108)] pub machine_settings_a: [u8;20],
-    // pub machine_settings_b: [u8;20],
-    
     #[check_align(148)]
     pub internal_window_has_resized: bool,
 
@@ -161,8 +163,7 @@ pub struct App {
 }
 
 impl App {
-    // pub fn add_basic_pray_directories() {
-    // }
+    pub fn add_basic_pray_directories(&mut self) {}
 
     // pub fn add_initalisation_function() -> undefined4 {
     // }
@@ -207,12 +208,6 @@ impl App {
             machine_settings: Configurator::new(),
             _padding7: Default::default(),
 
-            // user_settings_a: Default::default(),
-            // user_settings_b: Default::default(),
-            // machine_settings_a: Default::default(),
-            // machine_settings_b: Default::default(),
-
-
             internal_window_has_resized: false,
             internal_window_has_moved: false,
             display_settings_error_next_tick: false,
@@ -256,8 +251,9 @@ impl App {
     // pub fn begin_wait_cursor(&self) -> bool {
     // }
 
-    // pub fn call_initialization_functions(&mut self) {
-    // }
+    #[call_engine(0x005575d0)]
+    #[rustfmt::skip]
+    unsafe fn call_initialization_functions(&mut self);
 
     // pub fn change_resolution(&mut self) {
     // }
@@ -277,8 +273,9 @@ impl App {
     // pub fn create_new_world(&mut self, name: String) {
     // }
 
-    // pub fn create_progress_bar(&mut self) -> bool {
-    // }
+    #[call_engine(0x0054ff50)]
+    #[rustfmt::skip]
+    unsafe fn create_progress_bar(&mut self) -> bool;
 
     // pub fn debug_key_now(&mut self) -> bool {
     //     false
@@ -303,8 +300,12 @@ impl App {
     // pub fn do_i_need_to_get_password(&mut self) -> bool {
     // }
 
-    // pub fn do_load_world(&mut self, world: String) {
-    // }
+    fn do_load_world(&mut self, world: &str) {
+        let s = CppString::from(world.to_string());
+        unsafe {
+            _do_load_world(self, &s);
+        }
+    }
 
     // pub fn do_refresh_from_game_variables(&mut self) {
     // }
@@ -339,8 +340,10 @@ impl App {
     // pub fn get_default_mng(&mut self) -> String {
     // }
 
-    // pub fn get_eame_var(&mut self, var_name: String) -> CAOSVar {
-    // }
+    pub fn eame_var(&mut self, var_name: &str) -> &mut CAOSVar {
+        let s = CppString::from(var_name.to_string());
+        unsafe { &mut *_eame_var(self, &s) }
+    }
 
     // pub fn get_fastest_ticks(&mut self) -> bool {
     // }
@@ -361,7 +364,7 @@ impl App {
     // }
 
     fn _key_from_lang_cfg(&self, key: &str, default: &str) -> String {
-        let  language_config = Configurator::from("language.cfg");
+        let language_config = Configurator::from("language.cfg");
         language_config
             .get(key)
             .or(self.user_settings.get(key))
@@ -418,8 +421,8 @@ impl App {
             if !C_CALLED {
                 log::debug!("App Construction called");
                 //APP = std::mem::MaybeUninit::new(App::new());
-                
-                app_constructor(APP.get_mut());
+
+                _app_constructor(APP.get_mut());
 
                 std::ptr::write(&mut APP.get_mut().user_settings, Configurator::new());
                 std::ptr::write(&mut APP.get_mut().machine_settings, Configurator::new());
@@ -458,11 +461,95 @@ impl App {
     // pub fn handle_input(&mut self) {
     // }
 
-    // pub fn init(&mut self) -> bool {
-    // }
+    pub fn init(&mut self) -> Result<(), String> {
+        log::debug!("In App init");
 
-    // pub fn init_config_files(&mut self) -> bool {
-    // }
+        let dm = unsafe { DirectoryManager::get() };
+        let shared_gallery_dir = unsafe { dm.directory(0xd) };
+
+        let shared_gallery = SharedGallery::get();
+        shared_gallery.set_creature_gallery_folder(shared_gallery_dir.as_str());
+        unsafe { shared_gallery.clean_creature_gallery_folder() };
+
+        log::debug!("Loading modules");
+        ModuleImporter::load_modules()?;
+
+        log::debug!("Loading syntax tables");
+        let caos_description = unsafe { CAOSDescription::get() };
+        unsafe { caos_description.load_default_tables() };
+
+        for module in ModuleImporter::get().iter() {
+            module.call();
+        }
+
+        log::debug!("Making syntax file for CAOS tool");
+
+        let mut syntax_dir = unsafe { dm.directory(0x0) };
+        syntax_dir += "caos.syntax";
+        caos_description.save_syntax(syntax_dir.as_str())?;
+
+        unsafe { CAOSMachine::initialize_handler_tables() };
+
+        self.lang_catalogue();
+        log::debug!("Flight recorder self reference ;-)");
+
+        unsafe {
+            self.eame_var("engine_nudge_border_t").set_integer(2);
+            self.eame_var("engine_nudge_border_b").set_integer(2);
+            self.eame_var("engine_nudge_border_l").set_integer(2);
+            self.eame_var("engine_nudge_border_r").set_integer(2);
+        }
+
+        log::debug!("Setting up PRAY system.");
+        unsafe { PrayManager::get().set_language("UNKNOWN WHAT THIS IS") };
+        self.add_basic_pray_directories();
+
+        log::debug!("No need to seed random number generator, using rust rng.");
+
+        log::debug!("Calling generic init functions.");
+
+        unsafe { self.call_initialization_functions() };
+
+        log::debug!("Setting up view");
+
+        unsafe { self.set_up_main_view() };
+
+        unsafe {
+            let main_camera = MainCamera::get();
+            main_camera.enable();
+        }
+
+        unsafe { self.create_progress_bar() };
+
+        log::debug!("Loading startup world");
+
+        self.do_load_world("Startup");
+
+        unsafe {
+            self.refresh_from_game_variables();
+        }
+
+        log::debug!("Setting up sound");
+
+        unsafe { self.set_up_sound() };
+
+        log::debug!("Reinitializing catalogue files");
+
+        unsafe { self.init_localization() };
+
+        Ok(())
+    }
+
+    pub fn init_config_files(&mut self) -> std::io::Result<()> {
+        self.machine_settings.bind_to_file("machine.cfg")?;
+        self.user_settings.bind_to_file("user.cfg")?;
+
+        if let Some(game_name) = self.user_settings.get("Game Name") {
+            let game_name_str = game_name.clone();
+            self.set_game_name(game_name_str.as_str());
+        }
+        Ok(())
+    }
 
     // pub fn init_local_catalogue_files_from_the_worlds_directory(&mut self) -> bool {
     // }
@@ -491,20 +578,24 @@ impl App {
     // pub fn play_all_sounds_at_maximum_level(&self, nickname: String) {
     // }
 
-    // pub fn refresh_from_game_variables(&mut self) {
-    // }
+    #[call_engine(0x00550df0)]
+    #[rustfmt::skip]
+    pub unsafe fn refresh_from_game_variables(&mut self);
 
-    // pub fn set_game_name(&mut self, name: String) {
-    // }
+    pub fn set_game_name(&mut self, name: &str) {
+        self.game_name = CppString::from(name.to_string());
+    }
 
     // pub fn set_password(&mut self, name: String) {
     // }
 
-    // pub fn set_up_main_view(&mut self) {
-    // }
+    #[call_engine(0x0054e4d0)]
+    #[rustfmt::skip]
+    pub unsafe fn set_up_main_view(&mut self);
 
-    // pub fn set_up_sound(&mut self) {
-    // }
+    #[call_engine(0x0054e930)]
+    #[rustfmt::skip]
+    pub unsafe fn set_up_sound(&mut self);
 
     // pub fn set_whether_we_should_highlight_agents_known_to_creature(&mut self, flag: bool) {
     // }
@@ -567,17 +658,9 @@ impl App {
     #[rustfmt::skip]
     pub unsafe fn update(&mut self);
 
-    #[call_engine(0x05578b0)]
-    #[rustfmt::skip]
-    pub unsafe fn init_config_files(&mut self) -> bool;
-
     #[call_engine(0x0054f210)]
     #[rustfmt::skip]
     pub unsafe fn init_localization(&mut self) -> bool;
-
-    #[call_engine(0x0041d270)]
-    #[rustfmt::skip]
-    pub unsafe fn get_input_manager(&self) -> *mut InputManager;
 
     #[call_engine(0x0054e8d0)]
     #[rustfmt::skip]
@@ -601,4 +684,13 @@ pub unsafe fn inject_calls() {
 }
 
 #[call_engine(0x0054cc60, "thiscall")]
-unsafe fn app_constructor(app: &mut App);
+#[rustfmt::skip]
+unsafe fn _app_constructor(app: &mut App);
+
+#[call_engine(0x00550e10, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _do_load_world(app: &mut App, world: *const CppString);
+
+#[call_engine(0x00557c60, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;

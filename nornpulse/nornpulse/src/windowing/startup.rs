@@ -36,10 +36,7 @@ pub fn startup(cmd_line: &str) -> Result<(), String> {
     sdl_context.mouse().show_cursor(false);
 
     log::debug!("Calling startup.");
-    let result = unsafe { do_startup(*global::HWND) };
-    if !result {
-        return Err(String::from("Could not initialize app."));
-    }
+    do_startup(unsafe { *global::HWND })?;
 
     let event_subsystem = sdl_context.event()?;
     event_subsystem.register_custom_event::<TickGameStepEvent>()?;
@@ -93,9 +90,8 @@ fn init_sdl2_window(video_subsystem: &sdl2::VideoSubsystem) -> Result<sdl2::vide
 }
 
 fn init_app() -> Result<(), String> {
-    let success = unsafe { App::get().init_config_files() };
-    if !success {
-        return Err(String::from("Could not init config files."));
+    if let Err(e) = App::get().init_config_files() {
+        return Err(e.to_string());
     }
 
     let success = unsafe { DirectoryManager::get().read_from_configuration_files() };
@@ -120,24 +116,24 @@ fn process_event(event_subsystem: &sdl2::EventSubsystem, event: sdl2::event::Eve
     match event {
         Event::MouseMotion { x, y, .. } => {
             App::get().input_manager.sys_add_mouse_move_event(x, y);
-        },
+        }
         Event::MouseButtonDown {
             x, y, mouse_btn, ..
         } => {
             App::get()
                 .input_manager
                 .sys_add_mouse_down_event(x, y, map_mouse_btn(mouse_btn));
-        },
+        }
         Event::MouseButtonUp {
             x, y, mouse_btn, ..
         } => {
             App::get()
                 .input_manager
                 .sys_add_mouse_up_event(x, y, map_mouse_btn(mouse_btn));
-        },
+        }
         Event::MouseWheel { y, .. } => {
             App::get().input_manager.sys_add_mouse_wheel_event(0, 0, y);
-        },
+        }
         Event::Window { win_event, .. } => {
             use sdl2::event::WindowEvent;
             match win_event {
@@ -196,7 +192,7 @@ fn process_event(event_subsystem: &sdl2::EventSubsystem, event: sdl2::event::Eve
                 }
                 None => (),
             }
-        },
+        }
         Event::KeyUp {
             keycode: Some(Keycode::Return),
             keymod: Mod::LALTMOD,
@@ -204,13 +200,11 @@ fn process_event(event_subsystem: &sdl2::EventSubsystem, event: sdl2::event::Eve
         } => unsafe {
             App::get().toggle_full_screen_mode();
         },
-        Event::KeyUp { keycode, .. } => {
-            match keycode {
-                Some(k) => {
-                    App::get().input_manager.sys_add_key_up_event(k as i32);
-                }
-                None => (),
+        Event::KeyUp { keycode, .. } => match keycode {
+            Some(k) => {
+                App::get().input_manager.sys_add_key_up_event(k as i32);
             }
+            None => (),
         },
         Event::TextInput { text, .. } => {
             for c in text.chars() {
@@ -223,7 +217,7 @@ fn process_event(event_subsystem: &sdl2::EventSubsystem, event: sdl2::event::Eve
                         .sys_add_translated_char_event(*c16 as i32);
                 }
             }
-        },
+        }
         Event::User { .. } => {
             let tick_event = event.as_user_event_type::<TickGameStepEvent>();
             match tick_event {
@@ -247,8 +241,38 @@ fn do_app_update() -> bool {
     }
 }
 
-#[call_engine(0x00478b80, "cdecl")]
-unsafe fn do_startup(hwnd: HWND) -> bool;
+fn do_startup(hwnd: HWND) -> Result<(), String> {
+    log::debug!("In DoStartup");
+    unsafe { FUN_00480120(hwnd) };
+
+    log::debug!("Calling App init");
+    App::get().init()?;
+
+    log::debug!("Starting external interface");
+    let res = unsafe { start_external_interface(hwnd) };
+    if !res {
+        return Err(String::from("Failed to setup external interface."));
+    }
+
+    let res = unsafe { kick_start_timer(true) };
+    if !res {
+        return Err(String::from("Failed to kick-start timer."));
+    }
+
+    log::debug!("Finished DoStartup");
+
+    Ok(())
+}
+
+#[call_engine(0x00480120)]
+#[allow(non_snake_case)]
+unsafe fn FUN_00480120(hwnd: HWND);
+
+#[call_engine(0x0050c840, "cdecl")]
+unsafe fn start_external_interface(hwnd: HWND) -> bool;
+
+#[call_engine(0x00478d40)]
+unsafe fn kick_start_timer(b: bool) -> bool;
 
 #[call_engine(0x00478c50)]
 unsafe fn message_destroy_called();

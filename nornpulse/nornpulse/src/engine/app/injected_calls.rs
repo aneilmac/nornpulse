@@ -223,17 +223,21 @@ extern "thiscall" fn check_for_cd(_app: &App) -> bool {
 // extern "thiscall" fn get_is_screen_saver_preview(app: &App) -> bool {
 // }
 
-extern "thiscall" fn get_lang_catalogue(app: &mut App, out: *mut CppString) ->  *mut CppString {
+extern "thiscall" fn get_lang_catalogue(app: &mut App, out: *mut CppString) -> *mut CppString {
     let s = app.lang_catalogue();
     let s = CppString::from(s);
-    unsafe { std::ptr::write(out, s); }
+    unsafe {
+        std::ptr::write(out, s);
+    }
     out
 }
 
-extern "thiscall" fn get_lang_c_lib(app: &mut App, out: *mut CppString) ->  *mut CppString {
+extern "thiscall" fn get_lang_c_lib(app: &mut App, out: *mut CppString) -> *mut CppString {
     let s = app.lang_c_lib();
     let s = CppString::from(s);
-    unsafe { std::ptr::write(out, s); }
+    unsafe {
+        std::ptr::write(out, s);
+    }
     out
 }
 
