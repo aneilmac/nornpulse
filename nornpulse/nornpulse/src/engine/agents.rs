@@ -18,27 +18,27 @@ mod injected_calls {
 
     // C2E:0x0047fe50
     pub extern "thiscall" fn new_agenthandle(
-        dst: &mut mem::MaybeUninit<ca::AgentHandle>,
-    ) -> &ca::AgentHandle {
-        *dst = mem::MaybeUninit::new(ca::AgentHandle::default());
-        unsafe { dst.get_ref() }
+        dst: *mut ca::AgentHandle,
+    ) -> *mut ca::AgentHandle {
+        unsafe { std::ptr::write(dst, ca::AgentHandle::default()); }
+        dst
     }
     // C2E:0x0049c7c0,0x0049c7e0
     pub extern "thiscall" fn new_agenthandle_from(
-        dst: &mut mem::MaybeUninit<ca::AgentHandle>,
+        dst: *mut ca::AgentHandle,
         agent: *mut ca::Agent,
-    ) -> &ca::AgentHandle {
-        *dst = mem::MaybeUninit::new(ca::AgentHandle::from_agent(agent));
-        unsafe { dst.get_ref() }
+    ) -> *mut ca::AgentHandle {
+        unsafe { std::ptr::write(dst, ca::AgentHandle::default()); }
+        dst
     }
 
     // C2E:0x0049c810
     pub extern "thiscall" fn agenthandle_clone<'a>(
-        dst: &'a mut mem::MaybeUninit<ca::AgentHandle>,
+        dst: *mut ca::AgentHandle,
         src: &ca::AgentHandle,
-    ) -> &'a ca::AgentHandle {
-        *dst = mem::MaybeUninit::new(src.clone());
-        unsafe { dst.get_ref() }
+    ) -> *mut ca::AgentHandle {
+        unsafe { std::ptr::write(dst, src.clone()); }
+        dst
     }
 
     // C2E:0x0049c840

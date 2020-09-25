@@ -422,14 +422,14 @@ impl App {
                 log::debug!("App Construction called");
                 //APP = std::mem::MaybeUninit::new(App::new());
 
-                _app_constructor(APP.get_mut());
-
-                std::ptr::write(&mut APP.get_mut().user_settings, Configurator::new());
-                std::ptr::write(&mut APP.get_mut().machine_settings, Configurator::new());
+                _app_constructor(APP.as_mut_ptr());
+                
+                std::ptr::write(&mut (*APP.as_mut_ptr()).user_settings, Configurator::new());
+                std::ptr::write(&mut (*APP.as_mut_ptr()).machine_settings, Configurator::new());
 
                 C_CALLED = true;
             }
-            APP.get_mut()
+            &mut *APP.as_mut_ptr()
         }
     }
 
@@ -685,7 +685,7 @@ pub unsafe fn inject_calls() {
 
 #[call_engine(0x0054cc60, "thiscall")]
 #[rustfmt::skip]
-unsafe fn _app_constructor(app: &mut App);
+unsafe fn _app_constructor(app: *mut App);
 
 #[call_engine(0x00550e10, "thiscall")]
 #[rustfmt::skip]
