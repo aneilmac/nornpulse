@@ -7,9 +7,11 @@ pub mod configurator;
 pub mod creature_history;
 pub mod directory_manager;
 pub mod flight_recorder;
+pub mod handler_function;
 pub mod input_manager;
 pub mod main_camera;
 pub mod module_importer;
+pub mod op_spec;
 pub mod pray_manager;
 pub mod shared_gallery;
 

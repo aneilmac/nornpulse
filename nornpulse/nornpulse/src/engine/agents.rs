@@ -17,10 +17,10 @@ mod injected_calls {
     use super::*;
 
     // C2E:0x0047fe50
-    pub extern "thiscall" fn new_agenthandle(
-        dst: *mut ca::AgentHandle,
-    ) -> *mut ca::AgentHandle {
-        unsafe { std::ptr::write(dst, ca::AgentHandle::default()); }
+    pub extern "thiscall" fn new_agenthandle(dst: *mut ca::AgentHandle) -> *mut ca::AgentHandle {
+        unsafe {
+            std::ptr::write(dst, ca::AgentHandle::default());
+        }
         dst
     }
     // C2E:0x0049c7c0,0x0049c7e0
@@ -28,7 +28,9 @@ mod injected_calls {
         dst: *mut ca::AgentHandle,
         agent: *mut ca::Agent,
     ) -> *mut ca::AgentHandle {
-        unsafe { std::ptr::write(dst, ca::AgentHandle::default()); }
+        unsafe {
+            std::ptr::write(dst, ca::AgentHandle::default());
+        }
         dst
     }
 
@@ -37,7 +39,9 @@ mod injected_calls {
         dst: *mut ca::AgentHandle,
         src: &ca::AgentHandle,
     ) -> *mut ca::AgentHandle {
-        unsafe { std::ptr::write(dst, src.clone()); }
+        unsafe {
+            std::ptr::write(dst, src.clone());
+        }
         dst
     }
 

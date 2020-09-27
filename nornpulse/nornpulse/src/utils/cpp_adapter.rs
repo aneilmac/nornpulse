@@ -61,6 +61,12 @@ impl Into<String> for CppString {
     }
 }
 
+impl From<&str> for CppString {
+    fn from(string: &str) -> Self {
+        CppString::from(string.to_string())
+    }
+}
+
 impl From<String> for CppString {
     fn from(string: String) -> Self {
         let string = string.into_bytes();
@@ -133,7 +139,7 @@ impl CppString {
         std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
         *cpp_str_ptr = 0; // Ref count.
         CppString {
-            allocator: 0,
+            allocator: 0x04,
             data: cpp_str_ptr,
             length: len,
             capacity: len,

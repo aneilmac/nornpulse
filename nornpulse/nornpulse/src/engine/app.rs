@@ -301,7 +301,7 @@ impl App {
     // }
 
     fn do_load_world(&mut self, world: &str) {
-        let s = CppString::from(world.to_string());
+        let s = CppString::from(world);
         unsafe {
             _do_load_world(self, &s);
         }
@@ -341,7 +341,7 @@ impl App {
     // }
 
     pub fn eame_var(&mut self, var_name: &str) -> &mut CAOSVar {
-        let s = CppString::from(var_name.to_string());
+        let s = CppString::from(var_name);
         unsafe { &mut *_eame_var(self, &s) }
     }
 
@@ -423,9 +423,12 @@ impl App {
                 //APP = std::mem::MaybeUninit::new(App::new());
 
                 _app_constructor(APP.as_mut_ptr());
-                
+
                 std::ptr::write(&mut (*APP.as_mut_ptr()).user_settings, Configurator::new());
-                std::ptr::write(&mut (*APP.as_mut_ptr()).machine_settings, Configurator::new());
+                std::ptr::write(
+                    &mut (*APP.as_mut_ptr()).machine_settings,
+                    Configurator::new(),
+                );
 
                 C_CALLED = true;
             }
@@ -471,16 +474,18 @@ impl App {
         shared_gallery.set_creature_gallery_folder(shared_gallery_dir.as_str());
         unsafe { shared_gallery.clean_creature_gallery_folder() };
 
-        log::debug!("Loading modules");
-        ModuleImporter::load_modules()?;
+        log::debug!("Pretending to loading modules (no-op).");
+        // A function like: ModuleImporter::load_modules()
+        // would go here.
 
         log::debug!("Loading syntax tables");
         let caos_description = unsafe { CAOSDescription::get() };
         unsafe { caos_description.load_default_tables() };
 
-        for module in ModuleImporter::get().iter() {
-            module.call();
-        }
+        log::debug!("Pretending to execute netbabel module.");
+        // An iterator through all modules, loading up their syntax would go
+        // here.
+        ModuleImporter::load_net_caos()?;
 
         log::debug!("Making syntax file for CAOS tool");
 
@@ -583,7 +588,7 @@ impl App {
     pub unsafe fn refresh_from_game_variables(&mut self);
 
     pub fn set_game_name(&mut self, name: &str) {
-        self.game_name = CppString::from(name.to_string());
+        self.game_name = CppString::from(name);
     }
 
     // pub fn set_password(&mut self, name: String) {
