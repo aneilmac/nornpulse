@@ -82,7 +82,7 @@ use crate::utils::cpp_adapter::CppString;
 /// > OriginalDisplay DirectX (no modules)
 /// > *** *** ** **:**:** 2020 - *** - 2.286 b195
 ///
-/// This is because `engine-netbabel.dll` injected the command `net` into CAOS
+/// This is because `engine-netbabel.dll` injected the command `net: user` into CAOS
 /// using the CAOS tables.
 ///
 /// So `ModuleImporter` handles faking importing `engine-netbabel` which injects

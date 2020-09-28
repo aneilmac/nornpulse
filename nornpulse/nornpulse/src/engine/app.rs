@@ -10,11 +10,12 @@ use crate::engine::pray_manager::PrayManager;
 use crate::engine::shared_gallery::SharedGallery;
 use crate::utils::cpp_adapter::{CppString, CppVector};
 use callengine::{call_engine, CheckStructAlign};
+pub use injected_calls::inject_calls;
 
 mod injected_calls;
 
 static mut C_CALLED: bool = false;
-static mut WORLD_TICK_INTERVAL: i32 = 0x32;
+static mut WORLD_TICK_INTERVAL: u32 = 0x32;
 static mut APP: std::mem::MaybeUninit<App> = std::mem::MaybeUninit::uninit();
 
 #[repr(C, packed)]
@@ -146,7 +147,7 @@ pub struct App {
     refresh_display_at_end_of_tick: bool,
 
     #[check_align(319)]
-    fastest_ticks: bool,
+    pub fastest_ticks: bool,
 
     #[check_align(320)]
     maximum_distance_before_port_line_warns: f32,
@@ -459,7 +460,7 @@ impl App {
     // pub fn get_world_name(&self) -> String {
     // }
 
-    pub fn world_tick_interval() -> i32 {
+    pub fn world_tick_interval() -> u32 {
         unsafe { WORLD_TICK_INTERVAL }
     }
 
@@ -552,11 +553,6 @@ impl App {
     }
 
     pub fn init_config_files(&mut self) -> std::io::Result<()> {
-        let res;
-        unsafe {
-            res = _init_config_files(self);
-        }
-
         self.machine_settings.bind_to_file("machine.cfg")?;
         self.user_settings.bind_to_file("user.cfg")?;
 
@@ -619,7 +615,7 @@ impl App {
     // pub fn set_which_creature_permission_to_highlight(&mut self, permission: i32) {
     // }
 
-    pub fn set_world_tick_interval(tick: i32) {
+    pub fn set_world_tick_interval(tick: u32) {
         unsafe {
             WORLD_TICK_INTERVAL = tick;
         }
@@ -634,8 +630,9 @@ impl App {
     // pub fn set_should_skeletons_animate_double_speed(&self, flag: bool) {
     // }
 
-    // pub fn shut_down(&mut self) {
-    // }
+    #[call_engine(0x0054e3d0)]
+    #[rustfmt::skip]
+    pub unsafe fn shut_down(&mut self);
 
     // pub fn specify_progress_intervals(&mut self, i1: i32) {
     // }
@@ -695,10 +692,6 @@ impl App {
     pub unsafe fn toggle_full_screen_mode(&mut self) -> bool;
 }
 
-pub unsafe fn inject_calls() {
-    injected_calls::inject_calls()
-}
-
 #[call_engine(0x00557280, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _add_basic_pray_directories(app: *mut App);
@@ -714,7 +707,3 @@ unsafe fn _do_load_world(app: &mut App, world: *const CppString);
 #[call_engine(0x00557c60, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;
-
-#[call_engine(0x005578b0, "thiscall")]
-#[rustfmt::skip]
-unsafe fn _init_config_files(app: *mut App) -> bool;

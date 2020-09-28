@@ -296,7 +296,7 @@ extern "cdecl" fn get_the_app() -> &'static mut App {
 // extern "thiscall" fn get_world_name(app: &App) -> String {
 // }
 
-extern "cdecl" fn get_world_tick_interval() -> i32 {
+extern "cdecl" fn get_world_tick_interval() -> u32 {
     App::world_tick_interval()
 }
 
@@ -361,7 +361,7 @@ extern "cdecl" fn get_world_tick_interval() -> i32 {
 // extern "thiscall" fn set_which_creature_permission_to_highlight(app: &mut App, permission: i32) {
 // }
 
-extern "cdecl" fn set_world_tick_interval(tick: i32) {
+extern "cdecl" fn set_world_tick_interval(tick: u32) {
     App::set_world_tick_interval(tick)
 }
 
