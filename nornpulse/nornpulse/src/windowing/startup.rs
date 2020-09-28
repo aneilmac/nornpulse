@@ -208,8 +208,10 @@ impl GameLoop {
     fn make_timer_pair<'a>(&'a self) -> (mpsc::Receiver<()>, sdl2::timer::Timer<'a, 'a>) {
         let (tx, rx) = mpsc::sync_channel::<()>(0);
         let timer = self.timer_subsystem.add_timer(
-            get_ticks(),
+            0,
             Box::new(move || {
+                // Desired behaviour is that send blocks until the reciever accepts the current 
+                // send, so multiple ticks can't trigger.
                 let res = tx.send(());
                 if res.is_ok() {
                     get_ticks()

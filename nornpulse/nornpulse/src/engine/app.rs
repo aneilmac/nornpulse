@@ -19,9 +19,12 @@ static mut WORLD_TICK_INTERVAL: u32 = 0x32;
 static mut APP: std::mem::MaybeUninit<App> = std::mem::MaybeUninit::uninit();
 
 #[repr(C, packed)]
-#[derive(CheckStructAlign, Debug)]
+#[derive(CheckStructAlign)]
 pub struct App {
-    _unknown1: [u8; 4],
+    #[check_align(0)]
+    save_required: bool,
+
+    _padding8: [u8; 3],
 
     #[check_align(4)]
     current_loading_scene_name: CppString,
@@ -115,7 +118,8 @@ pub struct App {
     #[check_align(184)]
     pub input_manager: InputManager,
 
-    _unknown3: [u8; 4],
+    _unused_field_1: bool,
+    _padding10: [u8; 3],
 
     #[check_align(252)]
     game_name: CppString,
@@ -132,7 +136,13 @@ pub struct App {
     #[check_align(277)]
     autokill_agent_on_error_flag: bool,
 
-    _unknown6: [u8; 22],
+    _padding9: [u8; 2],
+
+    #[check_align(280)]
+    elapsed_time_history: CppVector<i32>,
+
+    #[check_align(296)]
+    elapsed_time_history_index: usize,
 
     #[check_align(300)]
     password: CppString,
@@ -155,12 +165,14 @@ pub struct App {
     #[check_align(324)]
     maximum_distance_before_port_line_snaps: f32,
 
-    _unknown8: [u8; 4],
+    #[check_align(328)]
+    last_timestamp: i32,
 
     #[check_align(332)]
     last_tick_gap: i32,
 
-    _padding5: [u8; 12],
+    #[check_align(336)]
+    eame_map: [u8; 12], // std::map<std::string, CAOSVAR>
 }
 
 impl App {
@@ -173,7 +185,8 @@ impl App {
 
     pub fn new() -> Self {
         Self {
-            _unknown1: Default::default(),
+            save_required: false,
+            _padding8: Default::default(),
             current_loading_scene_name: CppString::empty(),
             terminate_triggered: false,
             _unused_field_0: false,
@@ -228,13 +241,16 @@ impl App {
             handle: 0,
             world: 0,
             input_manager: InputManager::new(),
-            _unknown3: Default::default(),
+            _unused_field_1: false,
+            _padding10: Default::default(),
             game_name: CppString::empty(),
             system_tick: 0,
             unknown_progress_bar: 0,
             play_all_sounds_at_maximum_level_flag: false,
             autokill_agent_on_error_flag: false,
-            _unknown6: Default::default(),
+            _padding9: Default::default(),
+            elapsed_time_history: CppVector::empty(),
+            elapsed_time_history_index: 0,
             password: CppString::empty(),
             do_i_need_to_get_password: false,
             display_rendering: true,
@@ -242,9 +258,9 @@ impl App {
             fastest_ticks: false,
             maximum_distance_before_port_line_warns: 600.0,
             maximum_distance_before_port_line_snaps: 800.0,
-            _unknown8: Default::default(),
+            last_timestamp: Default::default(),
             last_tick_gap: -1,
-            _padding5: Default::default(),
+            eame_map: Default::default(),
         }
     }
 
