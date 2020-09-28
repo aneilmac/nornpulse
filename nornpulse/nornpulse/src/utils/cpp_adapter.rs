@@ -21,6 +21,32 @@ pub struct CppString {
     capacity: usize,
 }
 
+impl CppString {
+    pub unsafe fn from_c_str(c_str_ptr: *const c_char) -> Self {
+        let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
+        let len = c_str.to_bytes().len();
+        let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
+        // length + null terminator.
+        std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
+        *cpp_str_ptr = 0; // Ref count.
+        CppString {
+            allocator: 0x0,
+            data: cpp_str_ptr,
+            length: len,
+            capacity: len,
+        }
+    }
+
+    pub const fn empty() -> Self {
+        CppString {
+            allocator: 0,
+            data: std::ptr::null(),
+            length: 0,
+            capacity: 0,
+        }
+    }
+}
+
 impl std::fmt::Display for CppString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str_copy = Vec::<u8>::with_capacity(self.length);
@@ -127,32 +153,6 @@ impl Clone for CppString {
         let mut s = unsafe { CppString::from_c_str(self.data) };
         s.allocator = self.allocator;
         s
-    }
-}
-
-impl CppString {
-    pub unsafe fn from_c_str(c_str_ptr: *const c_char) -> Self {
-        let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
-        let len = c_str.to_bytes().len();
-        let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
-        // length + null terminator.
-        std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
-        *cpp_str_ptr = 0; // Ref count.
-        CppString {
-            allocator: 0x04,
-            data: cpp_str_ptr,
-            length: len,
-            capacity: len,
-        }
-    }
-
-    pub const fn empty() -> Self {
-        CppString {
-            allocator: 0,
-            data: std::ptr::null(),
-            length: 0,
-            capacity: 0,
-        }
     }
 }
 

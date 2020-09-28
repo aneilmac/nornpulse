@@ -163,7 +163,9 @@ pub struct App {
 }
 
 impl App {
-    pub fn add_basic_pray_directories(&mut self) {}
+    pub fn add_basic_pray_directories(&mut self) {
+        unsafe { _add_basic_pray_directories(self) }
+    }
 
     // pub fn add_initalisation_function() -> undefined4 {
     // }
@@ -485,6 +487,7 @@ impl App {
         log::debug!("Pretending to execute netbabel module.");
         // An iterator through all modules, loading up their syntax would go
         // here.
+
         ModuleImporter::load_net_caos()?;
 
         log::debug!("Making syntax file for CAOS tool");
@@ -506,7 +509,10 @@ impl App {
         }
 
         log::debug!("Setting up PRAY system.");
-        unsafe { PrayManager::get().set_language("UNKNOWN WHAT THIS IS") };
+        {
+            let lang = self.lang_catalogue();
+            unsafe { PrayManager::get().set_language(&lang) };
+        }
         self.add_basic_pray_directories();
 
         log::debug!("No need to seed random number generator, using rust rng.");
@@ -546,6 +552,11 @@ impl App {
     }
 
     pub fn init_config_files(&mut self) -> std::io::Result<()> {
+        let res;
+        unsafe {
+            res = _init_config_files(self);
+        }
+
         self.machine_settings.bind_to_file("machine.cfg")?;
         self.user_settings.bind_to_file("user.cfg")?;
 
@@ -688,6 +699,10 @@ pub unsafe fn inject_calls() {
     injected_calls::inject_calls()
 }
 
+#[call_engine(0x00557280, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _add_basic_pray_directories(app: *mut App);
+
 #[call_engine(0x0054cc60, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _app_constructor(app: *mut App);
@@ -699,3 +714,7 @@ unsafe fn _do_load_world(app: &mut App, world: *const CppString);
 #[call_engine(0x00557c60, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;
+
+#[call_engine(0x005578b0, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _init_config_files(app: *mut App) -> bool;
