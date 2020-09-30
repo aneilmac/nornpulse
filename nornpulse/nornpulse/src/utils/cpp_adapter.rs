@@ -23,6 +23,10 @@ pub struct CppString {
 
 impl CppString {
     pub unsafe fn from_c_str(c_str_ptr: *const c_char) -> Self {
+        if c_str_ptr.is_null() {
+            return Self::empty();
+        }
+
         let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
         let len = c_str.to_bytes().len();
         let cpp_str_ptr = operator_new(len + 2) as *mut c_char;

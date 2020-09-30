@@ -20,6 +20,18 @@ impl MainCamera {
     #[rustfmt::skip]
     pub unsafe fn enable(&mut self);
 
+    #[call_engine(0x0054e8a7)]
+    #[rustfmt::skip]
+    pub unsafe fn disable(&mut self);
+    
+    #[call_engine(0x0057e6c0)]
+    #[rustfmt::skip]
+    pub unsafe fn enable_map_image(&mut self);
+
+    #[call_engine(0x0057e6a0)]
+    #[rustfmt::skip]
+    pub unsafe fn disable_map_image(&mut self);
+
     #[call_engine(0x0057dfc0)]
     #[rustfmt::skip]
     pub unsafe fn render(&mut self);

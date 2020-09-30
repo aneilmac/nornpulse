@@ -12,6 +12,7 @@ use crate::engine::world::World;
 use crate::utils::cpp_adapter::{CppString, CppVector};
 use callengine::{call_engine, CheckStructAlign};
 pub use injected_calls::inject_calls;
+use std::ops::Div;
 use std::convert::TryInto;
 use std::time::Instant;
 
@@ -99,7 +100,7 @@ pub struct App {
     _padding3: [u8; 1],
 
     #[check_align(156)]
-    pub which_creaure_permission_to_highlight: i32,
+    pub which_creature_permission_to_highlight: i32,
 
     #[check_align(160)]
     pub line_plane: i32,
@@ -144,7 +145,9 @@ pub struct App {
     _padding9: [u8; 2],
 
     #[check_align(280)]
-    elapsed_time_history: CppVector<u32>,
+    elapsed_time_history: Vec<u32>,
+
+    _padding11: [u8; 4],
 
     #[check_align(296)]
     elapsed_time_history_index: usize,
@@ -184,9 +187,6 @@ impl App {
     pub fn add_basic_pray_directories(&mut self) {
         unsafe { _add_basic_pray_directories(self) }
     }
-
-    // pub fn add_initalisation_function() -> undefined4 {
-    // }
 
     pub fn new() -> Self {
         Self {
@@ -237,7 +237,7 @@ impl App {
             should_skeletons_animate_double_speed: false,
             whether_we_should_highlight_agents_known_to_creature: false,
             _padding3: Default::default(),
-            which_creaure_permission_to_highlight: 0,
+            which_creature_permission_to_highlight: 0,
             line_plane: 0x270e,
             creature_pickup_status: 0,
             only_play_midi_music_flag: false,
@@ -254,7 +254,8 @@ impl App {
             play_all_sounds_at_maximum_level_flag: false,
             autokill_agent_on_error_flag: false,
             _padding9: Default::default(),
-            elapsed_time_history: CppVector::empty(),
+            elapsed_time_history: Vec::new(),
+            _padding11: Default::default(),
             elapsed_time_history_index: 0,
             password: CppString::empty(),
             do_i_need_to_get_password: false,
@@ -269,29 +270,10 @@ impl App {
         }
     }
 
-    // pub fn auto_kill_agents_on_error(&self) -> bool {
-    // }
-
     // pub fn begin_wait_cursor(&self) -> bool {
     // }
 
-    #[call_engine(0x005575d0)]
-    #[rustfmt::skip]
-    unsafe fn call_initialization_functions(&mut self);
-
     // pub fn change_resolution(&mut self) {
-    // }
-
-    // pub fn check_all_free_disk_space(&mut self, i1: i32, i2: i32) -> bool {
-    // }
-
-    // pub fn check_for_cd(&self) -> bool {
-    // }
-
-    // pub fn check_for_mutex(&self) -> bool {
-    // }
-
-    // pub fn check_free_disk_space(&mut self, path: String, i1: i32) -> bool {
     // }
 
     // pub fn create_new_world(&mut self, name: String) {
@@ -305,24 +287,24 @@ impl App {
     //     false
     // }
 
-    // pub fn debug_key_now_no_shift(&mut self) -> bool {
-    //     false
-    // }
+    pub fn debug_key_now_no_shift(&self) -> bool {
+        let key = "engine_debug_keys";
+        unsafe { 
+            let caos_var = (*self.world).game_var(key);
+            caos_var.integer() == 1
+        }
+    }
 
     // pub fn delete_eame_var(&mut self, var_name: String) {
     // }
 
-    // pub fn disable_main_view(&mut self) {
-    // }
+    pub fn disable_main_view(&mut self) {
+        unsafe { MainCamera::get().disable(); }
+    }
 
-    // pub fn disable_map_image(&mut self) {
-    // }
-
-    // pub fn display_settings_error_next_tick(&mut self) {
-    // }
-
-    // pub fn do_i_need_to_get_password(&mut self) -> bool {
-    // }
+    pub fn disable_map_image(&mut self) {
+        unsafe { MainCamera::get().disable_map_image(); }
+    }
 
     fn do_load_world(&mut self, world: &str) {
         let s = CppString::from(world);
@@ -334,14 +316,13 @@ impl App {
     // pub fn do_refresh_from_game_variables(&mut self) {
     // }
 
-    // pub fn do_you_only_play_midi_music(&self) -> bool {
-    // }
+    pub fn enable_main_view(&mut self) {
+        unsafe { MainCamera::get().enable(); }
+    }
 
-    // pub fn enable_main_view(&mut self) {
-    // }
-
-    // pub fn enable_map_image(&mut self) {
-    // }
+    pub fn enable_map_image(&mut self) {
+        unsafe { MainCamera::get().enable_map_image(); }
+    }
 
     // pub fn end_progress_bar(&mut self) {
     // }
@@ -358,9 +339,6 @@ impl App {
     // pub fn get_app_details(&mut self, d1: &String, d2: &String, d3: &String) -> bool {
     // }
 
-    // pub fn get_creature_pickup_status(&mut self) -> int {
-    // }
-
     // pub fn get_default_mng(&mut self) -> String {
     // }
 
@@ -369,23 +347,13 @@ impl App {
         unsafe { &mut *_eame_var(self, &s) }
     }
 
-    // pub fn get_fastest_ticks(&mut self) -> bool {
-    // }
-
     // pub fn get_game_name(&mut self) -> String {
     // }
 
-    // pub fn get_game_var(&mut self, var_name: String) -> CAOSVar {
-    // }
-
-    // pub fn get_initialisation_functions(var_name: String) -> vector<fn (&mut App)> {
-    // }
-
-    // pub fn get_input_manager(&mut self) -> &mut InputManager {
-    // }
-
-    // pub fn get_is_screen_saver_preview(&self) -> bool {
-    // }
+    pub fn game_var(&self, key: &str) -> &CAOSVar {
+        let s = CppString::from(key);
+        unsafe { &*_get_game_var(self, &s) }
+    }
 
     fn _key_from_lang_cfg(&self, key: &str, default: &str) -> String {
         let language_config = Configurator::from("language.cfg");
@@ -404,21 +372,6 @@ impl App {
         self._key_from_lang_cfg("LanguageCLibrary", "english")
     }
 
-    // pub fn get_last_tick_gap(&self) -> int {
-    // }
-
-    // pub fn get_line_plane(&self) -> int {
-    // }
-
-    // pub fn get_maximum_distance_before_port_line_snaps(&self) -> int {
-    // }
-
-    // pub fn get_maximum_distance_before_port_line_warns(&self) -> float {
-    // }
-
-    // pub fn get_maximum_distance_before_port_line_warns(&self) -> float {
-    // }
-
     // pub fn get_network_nickname(&self) -> String {
     // }
 
@@ -428,16 +381,10 @@ impl App {
     // pub fn get_next_eame_var(&self, d: String) -> String {
     // }
 
-    // pub fn get_password(&self) -> String {
-    // }
-
     // pub fn get_preview_window_handle(&self) -> HWND__ {
     // }
 
     // pub fn get_screen_saver_config(&self) -> bool {
-    // }
-
-    // pub fn get_system_tick(&self) -> bool {
     // }
 
     pub fn get() -> &'static mut App {
@@ -454,6 +401,14 @@ impl App {
                     &mut (*APP.as_mut_ptr()).machine_settings,
                     Configurator::new(),
                 );
+
+                {
+                    let mut v = Vec::new();
+                    for i in 0..10 {
+                        v.push(i);
+                    }
+                    std::ptr::write(&mut (*APP.as_mut_ptr()).elapsed_time_history, v);
+                }
                 C_CALLED = true;
             }
 
@@ -461,8 +416,10 @@ impl App {
         }
     }
 
-    // pub fn get_tick_rate_factor(&self) -> float {
-    // }
+    pub fn tick_rate_factor(&self) -> f32 {
+        let s = self.elapsed_time_history.iter().sum::<u32>() as f32;
+        (s * 0.1).div(App::world_tick_interval() as f32)
+    }
 
     // pub fn get_warp_incoming_path(&self) -> String {
     // }
@@ -471,12 +428,6 @@ impl App {
     // }
 
     // pub fn get_warp_outgoing_path(&self) -> String {
-    // }
-
-    // pub fn which_creature_permission_to_highlight(&self) -> int {
-    // }
-
-    // pub fn get_world(&self) -> Box<World> {
     // }
 
     // pub fn get_world_name(&self) -> String {
@@ -500,18 +451,17 @@ impl App {
         shared_gallery.set_creature_gallery_folder(shared_gallery_dir.as_str());
         unsafe { shared_gallery.clean_creature_gallery_folder() };
 
-        log::debug!("Pretending to loading modules (no-op).");
         // A function like: ModuleImporter::load_modules()
         // would go here.
+        log::debug!("Pretending to loading modules (no-op).");
 
         log::debug!("Loading syntax tables");
         let caos_description = unsafe { CAOSDescription::get() };
         unsafe { caos_description.load_default_tables() };
 
-        log::debug!("Pretending to execute netbabel module.");
         // An iterator through all modules, loading up their syntax would go
         // here.
-
+        log::debug!("Pretending to execute netbabel module.");
         ModuleImporter::load_net_caos()?;
 
         log::debug!("Making syntax file for CAOS tool");
@@ -541,9 +491,7 @@ impl App {
 
         log::debug!("No need to seed random number generator, using rust rng.");
 
-        log::debug!("Calling generic init functions.");
-
-        unsafe { self.call_initialization_functions() };
+        log::debug!("Skipping calling generic init functions (no-op).");
 
         log::debug!("Setting up view");
 
@@ -600,19 +548,10 @@ impl App {
     #[rustfmt::skip]
     unsafe fn internal_window_has_resized(&mut self);
 
-    // pub fn is_app_a_screensaver(&self) -> bool {
-    // }
-
     // pub fn is_app_full_screen(&self) -> bool {
     // }
 
-    // pub fn machine_settings(&self) -> &Configurator {
-    // }
-
     // pub fn notify_new_nickname(&self, nickname: String) {
-    // }
-
-    // pub fn play_all_sounds_at_maximum_level(&self, nickname: String) {
     // }
 
     #[call_engine(0x00550df0)]
@@ -623,9 +562,6 @@ impl App {
         self.game_name = CppString::from(name);
     }
 
-    // pub fn set_password(&mut self, name: String) {
-    // }
-
     #[call_engine(0x0054e4d0)]
     #[rustfmt::skip]
     pub unsafe fn set_up_main_view(&mut self);
@@ -634,12 +570,6 @@ impl App {
     #[rustfmt::skip]
     pub unsafe fn set_up_sound(&mut self);
 
-    // pub fn set_whether_we_should_highlight_agents_known_to_creature(&mut self, flag: bool) {
-    // }
-
-    // pub fn set_which_creature_permission_to_highlight(&mut self, permission: i32) {
-    // }
-
     pub fn set_world_tick_interval(tick: u32) {
         unsafe {
             WORLD_TICK_INTERVAL = tick;
@@ -647,12 +577,6 @@ impl App {
     }
 
     // pub fn should_highlight_agents_known_to_creature(&self) -> bool {
-    // }
-
-    // pub fn should_skeletons_animate_double_speed(&self) -> bool {
-    // }
-
-    // pub fn set_should_skeletons_animate_double_speed(&self, flag: bool) {
     // }
 
     #[call_engine(0x0054e3d0)]
@@ -668,8 +592,9 @@ impl App {
     // pub fn toggle_full_screen_mode(&mut self) {
     // }
 
-    // pub fn toggle_midi(&mut self) {
-    // }
+    pub fn toggle_midi(&mut self) {
+        self.only_play_midi_music_flag = !self.only_play_midi_music_flag
+    }
 
     pub fn update(&mut self) {
         {
@@ -766,6 +691,9 @@ impl App {
                 self.elapsed_time_history_index = 0;
             }
 
+            // TODO: This can go back in time and be negative, will need to figure out why.
+            // By Instant's documentation this should be impossible, so something funny is
+            // happening in the exe end.
             let elapsed = duration.saturating_sub(self.last_timestamp);
             self.elapsed_time_history[self.elapsed_time_history_index] = elapsed;
         }
@@ -777,12 +705,6 @@ impl App {
     // pub fn update_progress_bar(&mut self, progress: i32) {
     // }
 
-    // pub fn user_settings(&self) -> &Configurator {
-    // }
-
-    // pub fn window_has_moved(&self) -> bool {
-    // }
-
     pub fn process_command_line(&mut self, args: &str) {
         if args == "--autokill" {
             self.autokill_agent_on_error_flag = true;
@@ -792,14 +714,6 @@ impl App {
     #[call_engine(0x0054f210)]
     #[rustfmt::skip]
     pub unsafe fn init_localization(&mut self) -> bool;
-
-    #[call_engine(0x0054e8d0)]
-    #[rustfmt::skip]
-    pub unsafe fn window_has_moved(&mut self);
-
-    #[call_engine(0x0054e8e0)]
-    #[rustfmt::skip]
-    pub unsafe fn window_has_resized(&mut self);
 
     #[call_engine(0x00557fa0)]
     #[rustfmt::skip]
@@ -837,6 +751,11 @@ unsafe fn _do_load_world(app: &mut App, world: *const CppString);
 #[rustfmt::skip]
 unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;
 
+#[call_engine(0x00478e80, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _get_game_var(app: *const App, key: *const CppString) -> *const CAOSVar;
+
 #[call_engine(0x00478e80)]
 #[rustfmt::skip]
 unsafe fn _quit_signalled();
+

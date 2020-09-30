@@ -15,22 +15,15 @@ pub struct InputEvent {
     param_3: i32,
 }
 
-#[repr(C, packed)]
-#[derive(Debug, CheckStructAlign)]
+#[repr(C)]
+#[derive(Debug)]
 pub struct InputManager {
-    #[check_align(0)]
     events: CppVector<InputEvent>,
-    #[check_align(16)]
     pub pending_mask: usize,
-    #[check_align(20)]
     pub mouse_x: i32,
-    #[check_align(24)]
     pub mouse_y: i32,
-    #[check_align(28)]
     n_count: usize,
-    #[check_align(32)]
     x_history: CppVector<i32>,
-    #[check_align(48)]
     y_history: CppVector<i32>,
 }
 

@@ -8,7 +8,6 @@ use winapi::shared::windef::HWND;
 mod global {
     use super::*;
     pub const HWND: *mut HWND = unsafe { std::mem::transmute(0x0060ebe0) };
-    pub const GAME_RUNNING: *mut bool = unsafe { std::mem::transmute(0x0060eba8) };
 }
 
 const WINDOW_TITLE: &str = "nornpulse";
@@ -25,9 +24,7 @@ struct GameLoop {
 
 impl GameLoop {
     fn setup(cmd_line: &str) -> Result<GameLoop, String> {
-        unsafe {
-            *global::GAME_RUNNING = true;
-        }
+
 
         App::get().process_command_line(cmd_line);
         init_configuration()?;
@@ -117,8 +114,8 @@ impl GameLoop {
             Event::Window { win_event, .. } => {
                 use sdl2::event::WindowEvent;
                 match win_event {
-                    WindowEvent::Moved(..) => unsafe { App::get().window_has_moved() },
-                    WindowEvent::Resized(..) => unsafe { App::get().window_has_resized() },
+                    WindowEvent::Moved(..) => App::get().window_has_moved_flag = true,
+                    WindowEvent::Resized(..) => App::get().window_has_resized_flag = true,
                     _ => (),
                 }
             }
