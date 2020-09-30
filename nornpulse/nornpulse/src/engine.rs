@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod app;
+pub mod camera;
 pub mod caos_description;
 pub mod caos_machine;
 pub mod caos_var;
@@ -16,6 +17,7 @@ pub mod module_importer;
 pub mod op_spec;
 pub mod pray_manager;
 pub mod shared_gallery;
+pub mod world;
 
 pub unsafe fn inject_calls() {
     flight_recorder::inject_calls();

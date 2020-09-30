@@ -20,7 +20,6 @@ struct TickGameStepEvent {}
 struct GameLoop {
     sdl_context: sdl2::Sdl,
     _window: sdl2::video::Window,
-    timer_subsystem: sdl2::TimerSubsystem,
     event_subsystem: sdl2::EventSubsystem,
 }
 
@@ -51,11 +50,8 @@ impl GameLoop {
         let event_subsystem = sdl_context.event()?;
         event_subsystem.register_custom_event::<TickGameStepEvent>()?;
 
-        let timer_subsystem = sdl_context.timer()?;
-
         Ok(Self {
             sdl_context: sdl_context,
-            timer_subsystem: timer_subsystem,
             event_subsystem: event_subsystem,
             _window: window,
         })
@@ -64,7 +60,8 @@ impl GameLoop {
     fn execute(&self) -> Result<(), String> {
         log::debug!("Starting message loop.");
 
-        let (rx, _timer) = self.make_timer_pair();
+        let timer_subsystem = self.sdl_context.timer()?;
+        let (rx, _timer) = make_timer_pair(&timer_subsystem);
 
         let mut event_pump = self.sdl_context.event_pump()?;
 
@@ -204,24 +201,6 @@ impl GameLoop {
             _ => log::debug!("Uncaptured event: {:?}", event),
         }
     }
-
-    fn make_timer_pair<'a>(&'a self) -> (mpsc::Receiver<()>, sdl2::timer::Timer<'a, 'a>) {
-        let (tx, rx) = mpsc::sync_channel::<()>(0);
-        let timer = self.timer_subsystem.add_timer(
-            0,
-            Box::new(move || {
-                // Desired behaviour is that send blocks until the reciever accepts the current 
-                // send, so multiple ticks can't trigger.
-                let res = tx.send(());
-                if res.is_ok() {
-                    get_ticks()
-                } else {
-                    0
-                }
-            }),
-        );
-        (rx, timer)
-    }
 }
 
 pub fn startup(cmd_line: &str) -> Result<(), String> {
@@ -282,13 +261,24 @@ fn get_ticks() -> u32 {
     }
 }
 
-fn do_app_update() -> bool {
-    unsafe {
-        let break_after_step = !App::get().terminate_triggered;
-        App::get().update();
-        App::get().input_manager.sys_flush_event_buffer();
-        break_after_step
-    }
+fn make_timer_pair<'a>(
+    timer_subsystem: &'a sdl2::TimerSubsystem,
+) -> (mpsc::Receiver<()>, sdl2::timer::Timer<'a, 'a>) {
+    let (tx, rx) = mpsc::sync_channel::<()>(0);
+    let timer = timer_subsystem.add_timer(
+        0,
+        Box::new(move || {
+            // Desired behaviour is that send blocks until the reciever accepts the current
+            // send, so multiple ticks can't trigger.
+            let res = tx.send(());
+            if res.is_ok() {
+                get_ticks()
+            } else {
+                0
+            }
+        }),
+    );
+    (rx, timer)
 }
 
 fn attempt_app_update(rx: &mpsc::Receiver<()>) -> bool {
@@ -298,4 +288,11 @@ fn attempt_app_update(rx: &mpsc::Receiver<()>) -> bool {
         Err(TryRecvError::Empty) => true,
         Err(TryRecvError::Disconnected) => false,
     }
+}
+
+fn do_app_update() -> bool {
+    let break_after_step = !App::get().terminate_triggered;
+    App::get().update();
+    App::get().input_manager.sys_flush_event_buffer();
+    break_after_step
 }

@@ -8,15 +8,20 @@ use crate::engine::main_camera::MainCamera;
 use crate::engine::module_importer::ModuleImporter;
 use crate::engine::pray_manager::PrayManager;
 use crate::engine::shared_gallery::SharedGallery;
+use crate::engine::world::World;
 use crate::utils::cpp_adapter::{CppString, CppVector};
 use callengine::{call_engine, CheckStructAlign};
 pub use injected_calls::inject_calls;
+use std::convert::TryInto;
+use std::time::Instant;
 
 mod injected_calls;
 
 static mut C_CALLED: bool = false;
 static mut WORLD_TICK_INTERVAL: u32 = 0x32;
 static mut APP: std::mem::MaybeUninit<App> = std::mem::MaybeUninit::uninit();
+
+static mut APP_INSTANT: std::mem::MaybeUninit<Instant> = std::mem::MaybeUninit::uninit();
 
 #[repr(C, packed)]
 #[derive(CheckStructAlign)]
@@ -27,7 +32,7 @@ pub struct App {
     _padding8: [u8; 3],
 
     #[check_align(4)]
-    current_loading_scene_name: CppString,
+    pending_loading_scene_name: CppString,
 
     #[check_align(20)]
     pub terminate_triggered: bool,
@@ -71,19 +76,19 @@ pub struct App {
     _padding7: [u8; 28],
 
     #[check_align(148)]
-    pub internal_window_has_resized: bool,
+    pub internal_window_has_resized_flag: bool,
 
     #[check_align(149)]
-    pub internal_window_has_moved: bool,
+    pub internal_window_has_moved_flag: bool,
 
     #[check_align(150)]
     pub display_settings_error_next_tick: bool,
 
     #[check_align(151)]
-    pub window_has_resized: bool,
+    pub window_has_resized_flag: bool,
 
     #[check_align(152)]
-    pub window_has_moved: bool,
+    pub window_has_moved_flag: bool,
 
     #[check_align(153)]
     pub should_skeletons_animate_double_speed: bool,
@@ -113,7 +118,7 @@ pub struct App {
     pub handle: usize,
 
     #[check_align(180)]
-    pub world: usize,
+    pub world: *mut World,
 
     #[check_align(184)]
     pub input_manager: InputManager,
@@ -139,7 +144,7 @@ pub struct App {
     _padding9: [u8; 2],
 
     #[check_align(280)]
-    elapsed_time_history: CppVector<i32>,
+    elapsed_time_history: CppVector<u32>,
 
     #[check_align(296)]
     elapsed_time_history_index: usize,
@@ -166,10 +171,10 @@ pub struct App {
     maximum_distance_before_port_line_snaps: f32,
 
     #[check_align(328)]
-    last_timestamp: i32,
+    last_timestamp: u32,
 
     #[check_align(332)]
-    last_tick_gap: i32,
+    last_tick_gap: u32,
 
     #[check_align(336)]
     eame_map: [u8; 12], // std::map<std::string, CAOSVAR>
@@ -187,7 +192,7 @@ impl App {
         Self {
             save_required: false,
             _padding8: Default::default(),
-            current_loading_scene_name: CppString::empty(),
+            pending_loading_scene_name: CppString::empty(),
             terminate_triggered: false,
             _unused_field_0: false,
             _padding1: Default::default(),
@@ -224,11 +229,11 @@ impl App {
             machine_settings: Configurator::new(),
             _padding7: Default::default(),
 
-            internal_window_has_resized: false,
-            internal_window_has_moved: false,
+            internal_window_has_resized_flag: false,
+            internal_window_has_moved_flag: false,
             display_settings_error_next_tick: false,
-            window_has_resized: false,
-            window_has_moved: false,
+            window_has_resized_flag: false,
+            window_has_moved_flag: false,
             should_skeletons_animate_double_speed: false,
             whether_we_should_highlight_agents_known_to_creature: false,
             _padding3: Default::default(),
@@ -239,7 +244,7 @@ impl App {
             _padding4: Default::default(),
             h_cursor: 0,
             handle: 0,
-            world: 0,
+            world: std::ptr::null_mut::<World>(),
             input_manager: InputManager::new(),
             _unused_field_1: false,
             _padding10: Default::default(),
@@ -258,8 +263,8 @@ impl App {
             fastest_ticks: false,
             maximum_distance_before_port_line_warns: 600.0,
             maximum_distance_before_port_line_snaps: 800.0,
-            last_timestamp: Default::default(),
-            last_tick_gap: -1,
+            last_timestamp: 0,
+            last_tick_gap: 0xFFFFFFFF,
             eame_map: Default::default(),
         }
     }
@@ -440,6 +445,7 @@ impl App {
             if !C_CALLED {
                 log::debug!("App Construction called");
                 //APP = std::mem::MaybeUninit::new(App::new());
+                APP_INSTANT = std::mem::MaybeUninit::new(Instant::now());
 
                 _app_constructor(APP.as_mut_ptr());
 
@@ -448,9 +454,9 @@ impl App {
                     &mut (*APP.as_mut_ptr()).machine_settings,
                     Configurator::new(),
                 );
-
                 C_CALLED = true;
             }
+
             &mut *APP.as_mut_ptr()
         }
     }
@@ -480,8 +486,9 @@ impl App {
         unsafe { WORLD_TICK_INTERVAL }
     }
 
-    // pub fn handle_input(&mut self) {
-    // }
+    #[call_engine(0x0054f970)]
+    #[rustfmt::skip]
+    pub unsafe fn handle_input(&mut self);
 
     pub fn init(&mut self) -> Result<(), String> {
         log::debug!("In App init");
@@ -585,11 +592,13 @@ impl App {
     // pub fn init_localisation(&mut self) -> bool {
     // }
 
-    // pub fn _internal_window_has_moved(&mut self) {
-    // }
+    #[call_engine(0x0054e920)]
+    #[rustfmt::skip]
+    unsafe fn internal_window_has_moved(&mut self);
 
-    // pub fn _internal_window_has_resized(&mut self) {
-    // }
+    #[call_engine(0x0054e8f0)]
+    #[rustfmt::skip]
+    unsafe fn internal_window_has_resized(&mut self);
 
     // pub fn is_app_a_screensaver(&self) -> bool {
     // }
@@ -662,8 +671,105 @@ impl App {
     // pub fn toggle_midi(&mut self) {
     // }
 
-    // pub fn update_app(&mut self) {
-    // }
+    pub fn update(&mut self) {
+        {
+            let duration = ticks().unwrap();
+            self.last_tick_gap = duration.saturating_sub(self.last_timestamp);
+            self.last_timestamp = duration;
+        }
+
+        unsafe {
+            MainCamera::get().make_the_entity_handler_reset_bounds_properly();
+        }
+
+        if self.display_settings_error_next_tick {
+            // On windows this does something quite complex that involves message boxes, on Linux,
+            // the bool is reset and nothing else happening. If not worthwhile enough to port to
+            // Linux we're not going to bother figuring it out what it is.
+            self.display_settings_error_next_tick = false;
+        }
+
+        if self.internal_window_has_moved_flag {
+            unsafe {
+                self.internal_window_has_moved();
+            }
+            self.internal_window_has_moved_flag = false;
+        }
+
+        if self.internal_window_has_resized_flag {
+            unsafe {
+                self.internal_window_has_resized();
+            }
+            self.internal_window_has_resized_flag = false;
+        }
+
+        if self.window_has_moved_flag {
+            self.window_has_moved_flag = false;
+            self.internal_window_has_moved_flag = true;
+            unsafe {
+                self.internal_window_has_moved();
+            }
+        }
+
+        if self.window_has_resized_flag {
+            self.window_has_resized_flag = false;
+            self.internal_window_has_resized_flag = true;
+            unsafe {
+                self.internal_window_has_resized();
+            }
+        }
+
+        if self.save_required {
+            unsafe {
+                (*self.world).save();
+            }
+            self.save_required = false;
+        }
+
+        if self.terminate_triggered {
+            log::debug!("Signalling termination.");
+            unsafe {
+                _quit_signalled();
+            }
+            self.terminate_triggered = false;
+        }
+
+        {
+            let game_name = self.pending_loading_scene_name.to_string();
+            if !game_name.is_empty() {
+                self.do_load_world(&game_name);
+                self.pending_loading_scene_name = CppString::empty();
+            }
+        }
+
+        unsafe {
+            self.handle_input();
+        }
+        self.system_tick += 1;
+
+        // Module Interface would go here for calling world ticks.
+
+        unsafe { (*self.world).task_switcher() };
+
+        if self.display_rendering || self.refresh_display_at_end_of_tick {
+            unsafe {
+                MainCamera::get().render();
+            }
+            self.refresh_display_at_end_of_tick = false;
+        }
+
+        unsafe {
+            let duration = ticks().unwrap();
+
+            self.elapsed_time_history_index += 1;
+            if 9 < self.elapsed_time_history_index {
+                self.elapsed_time_history_index = 0;
+            }
+
+            let elapsed = duration.saturating_sub(self.last_timestamp);
+            self.elapsed_time_history[self.elapsed_time_history_index] = elapsed;
+        }
+    }
 
     // pub fn update_progress_bar(&mut self, progress: i32) {
     // }
@@ -682,10 +788,6 @@ impl App {
             self.autokill_agent_on_error_flag = true;
         }
     }
-
-    #[call_engine(0x0054e000)]
-    #[rustfmt::skip]
-    pub unsafe fn update(&mut self);
 
     #[call_engine(0x0054f210)]
     #[rustfmt::skip]
@@ -708,6 +810,17 @@ impl App {
     pub unsafe fn toggle_full_screen_mode(&mut self) -> bool;
 }
 
+/// Will fail after ~49 days of play due to integer overflow.
+/// This is terrible for wolfing runs and we need out of the u32 sized
+/// types as soon as humanly possible.
+fn ticks() -> Option<u32> {
+    unsafe {
+        // TODO: Will be real swell to store the Instant objects directly in `App`.
+        let duration = Instant::now().duration_since(*APP_INSTANT.as_ptr());
+        duration.as_millis().try_into().ok()
+    }
+}
+
 #[call_engine(0x00557280, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _add_basic_pray_directories(app: *mut App);
@@ -723,3 +836,7 @@ unsafe fn _do_load_world(app: &mut App, world: *const CppString);
 #[call_engine(0x00557c60, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;
+
+#[call_engine(0x00478e80)]
+#[rustfmt::skip]
+unsafe fn _quit_signalled();
