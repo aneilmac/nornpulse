@@ -24,9 +24,7 @@ struct GameLoop {
 
 impl GameLoop {
     fn setup(cmd_line: &str) -> Result<GameLoop, String> {
-
-
-        App::get().process_command_line(cmd_line);
+        App::get_mut().process_command_line(cmd_line);
         init_configuration()?;
 
         log::debug!("Setting up SDL2.");
@@ -65,7 +63,7 @@ impl GameLoop {
         // TODO, find out why this can not be called before event-pump.
         // It's affecting event_pump init in unexpected ways.
         log::debug!("Calling App init");
-        App::get().init()?;
+        App::get_mut().init()?;
 
         'game_loop: loop {
             for event in event_pump.poll_event() {
@@ -79,7 +77,7 @@ impl GameLoop {
         }
 
         log::debug!("Shutdown message loop.");
-        unsafe { App::get().shut_down() }
+        unsafe { App::get_mut().shut_down() }
 
         Ok(())
     }
@@ -92,30 +90,34 @@ impl GameLoop {
 
         match event {
             Event::MouseMotion { x, y, .. } => {
-                App::get().input_manager.sys_add_mouse_move_event(x, y);
+                App::get_mut().input_manager.sys_add_mouse_move_event(x, y);
             }
             Event::MouseButtonDown {
                 x, y, mouse_btn, ..
             } => {
-                App::get()
-                    .input_manager
-                    .sys_add_mouse_down_event(x, y, map_mouse_btn(mouse_btn));
+                App::get_mut().input_manager.sys_add_mouse_down_event(
+                    x,
+                    y,
+                    map_mouse_btn(mouse_btn),
+                );
             }
             Event::MouseButtonUp {
                 x, y, mouse_btn, ..
             } => {
-                App::get()
+                App::get_mut()
                     .input_manager
                     .sys_add_mouse_up_event(x, y, map_mouse_btn(mouse_btn));
             }
             Event::MouseWheel { y, .. } => {
-                App::get().input_manager.sys_add_mouse_wheel_event(0, 0, y);
+                App::get_mut()
+                    .input_manager
+                    .sys_add_mouse_wheel_event(0, 0, y);
             }
             Event::Window { win_event, .. } => {
                 use sdl2::event::WindowEvent;
                 match win_event {
-                    WindowEvent::Moved(..) => App::get().window_has_moved_flag = true,
-                    WindowEvent::Resized(..) => App::get().window_has_resized_flag = true,
+                    WindowEvent::Moved(..) => App::get_mut().window_has_moved_flag = true,
+                    WindowEvent::Resized(..) => App::get_mut().window_has_resized_flag = true,
                     _ => (),
                 }
             }
@@ -138,7 +140,9 @@ impl GameLoop {
                     repeat: false,
                 });
             }
-            Event::KeyDown { keycode, .. } => {
+            Event::KeyDown {
+                keycode, keymod, ..
+            } => {
                 // TODO Break Key. (CTRL+PAUSE). Shows a dialog saying
                 // "This will quit creatures without saving." On yes the game
                 // quits. Otherwise no-op.
@@ -153,7 +157,9 @@ impl GameLoop {
                         let vk_k = keycode_to_vk_keycode(k);
                         match vk_k {
                             Some(v) => {
-                                App::get().input_manager.sys_add_key_down_event(v);
+                                App::get_mut()
+                                    .input_manager
+                                    .sys_add_key_down_event(v, keymod);
 
                                 // TODO: input_manager handles this all
                                 // as a TextEdit event.
@@ -161,7 +167,9 @@ impl GameLoop {
                                     || k == Keycode::Backspace
                                     || k == Keycode::Escape
                                 {
-                                    App::get().input_manager.sys_add_translated_char_event(v);
+                                    App::get_mut()
+                                        .input_manager
+                                        .sys_add_translated_char_event(v);
                                 }
                             }
                             None => log::debug!("Unknown key: {:?}", keycode),
@@ -175,11 +183,11 @@ impl GameLoop {
                 keymod: Mod::LALTMOD,
                 ..
             } => unsafe {
-                App::get().toggle_full_screen_mode();
+                App::get_mut().toggle_full_screen_mode();
             },
             Event::KeyUp { keycode, .. } => match keycode {
                 Some(k) => {
-                    App::get().input_manager.sys_add_key_up_event(k as i32);
+                    App::get_mut().input_manager.sys_add_key_up_event(k as i32);
                 }
                 None => (),
             },
@@ -189,7 +197,7 @@ impl GameLoop {
                     let mut char_buffer: [u16; 2] = Default::default();
                     let slice = c.encode_utf16(&mut char_buffer);
                     for c16 in slice {
-                        App::get()
+                        App::get_mut()
                             .input_manager
                             .sys_add_translated_char_event(*c16 as i32);
                     }
@@ -232,16 +240,16 @@ fn init_sdl2_window(video_subsystem: &sdl2::VideoSubsystem) -> Result<sdl2::vide
 }
 
 fn init_configuration() -> Result<(), String> {
-    if let Err(e) = App::get().init_config_files() {
+    if let Err(e) = App::get_mut().init_config_files() {
         return Err(e.to_string());
     }
 
-    let success = unsafe { DirectoryManager::get().read_from_configuration_files() };
+    let success = unsafe { DirectoryManager::get_mut().read_from_configuration_files() };
     if !success {
         return Err(String::from("Could not read config files."));
     }
 
-    let success = unsafe { App::get().init_localization() };
+    let success = unsafe { App::get_mut().init_localization() };
     if !success {
         return Err(String::from("Could not init localization."));
     }
@@ -289,7 +297,7 @@ fn attempt_app_update(rx: &mpsc::Receiver<()>) -> bool {
 
 fn do_app_update() -> bool {
     let break_after_step = !App::get().terminate_triggered;
-    App::get().update();
-    App::get().input_manager.sys_flush_event_buffer();
+    App::get_mut().update();
+    App::get_mut().input_manager.sys_flush_event_buffer();
     break_after_step
 }

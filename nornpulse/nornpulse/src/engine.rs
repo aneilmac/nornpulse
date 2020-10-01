@@ -9,6 +9,7 @@ pub mod configurator;
 pub mod creature_history;
 pub mod directory_manager;
 pub mod display_engine;
+pub mod file_path;
 pub mod flight_recorder;
 pub mod handler_function;
 pub mod input_manager;
@@ -26,4 +27,5 @@ pub unsafe fn inject_calls() {
     app::inject_calls();
     creature_history::inject_calls();
     configurator::inject_calls();
+    input_manager::inject_calls();
 }

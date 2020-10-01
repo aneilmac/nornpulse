@@ -1,6 +1,6 @@
 use crate::engine::caos_var::CAOSVar;
-use callengine::call_engine;
 use crate::utils::cpp_adapter::CppString;
+use callengine::call_engine;
 
 #[repr(C, packed)]
 pub struct World {}
@@ -23,9 +23,9 @@ impl World {
     pub unsafe fn task_switcher(&mut self);
 
     pub fn game_var(&self, key: &str) -> &CAOSVar {
-      let s = CppString::from(key);
-      unsafe { &*_get_game_var(self, &s) }
-  }
+        let s = CppString::from(key);
+        unsafe { &*_get_game_var(self, &s) }
+    }
 }
 
 #[call_engine(0x005204b0, "thiscall")]

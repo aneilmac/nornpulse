@@ -7,7 +7,11 @@ use callengine::call_engine;
 pub struct CAOSDescription {}
 
 impl CAOSDescription {
-    pub unsafe fn get() -> &'static mut CAOSDescription {
+    pub unsafe fn get() -> &'static CAOSDescription {
+        std::mem::transmute(0x0060fa08)
+    }
+
+    pub unsafe fn get_mut() -> &'static mut CAOSDescription {
         std::mem::transmute(0x0060fa08)
     }
 

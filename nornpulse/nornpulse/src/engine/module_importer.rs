@@ -91,7 +91,7 @@ use crate::utils::cpp_adapter::CppString;
 pub struct ModuleImporter {}
 impl ModuleImporter {
     pub fn load_net_caos() -> Result<(), String> {
-        let caos_description = unsafe { CAOSDescription::get() };
+        let caos_description = unsafe { CAOSDescription::get_mut() };
 
         let net_str = "NET:";
 

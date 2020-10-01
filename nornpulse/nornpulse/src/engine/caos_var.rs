@@ -2,7 +2,7 @@ use callengine::call_engine;
 
 #[repr(C, packed)]
 pub struct CAOSVar {
-    _unknown: [u8; 30],
+    _unknown: [u8; 17],
 }
 
 impl CAOSVar {
@@ -20,3 +20,17 @@ impl CAOSVar {
         }
     }
 }
+
+impl Default for CAOSVar {
+    fn default() -> Self {
+        unsafe {
+            let mut caos_var: CAOSVar = std::mem::zeroed();
+            _constructor(&mut caos_var);
+            caos_var
+        }
+    }
+}
+
+#[call_engine(0x0041a6a0, "thiscall")]
+#[rustfmt::skip]
+unsafe fn _constructor(storage: *mut CAOSVar) -> *mut CAOSVar;

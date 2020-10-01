@@ -1,8 +1,13 @@
+mod injected_calls;
+
+pub use injected_calls::inject_calls;
+
 use crate::engine::caos_description::CAOSDescription;
 use crate::engine::caos_machine::CAOSMachine;
 use crate::engine::caos_var::CAOSVar;
 use crate::engine::configurator::Configurator;
 use crate::engine::directory_manager::DirectoryManager;
+use crate::engine::file_path::FilePath;
 use crate::engine::input_manager::InputManager;
 use crate::engine::main_camera::MainCamera;
 use crate::engine::module_importer::ModuleImporter;
@@ -10,13 +15,13 @@ use crate::engine::pray_manager::PrayManager;
 use crate::engine::shared_gallery::SharedGallery;
 use crate::engine::world::World;
 use crate::utils::cpp_adapter::{CppString, CppVector};
-use callengine::{call_engine, CheckStructAlign};
-pub use injected_calls::inject_calls;
-use std::ops::Div;
-use std::convert::TryInto;
-use std::time::Instant;
 
-mod injected_calls;
+use callengine::{call_engine, CheckStructAlign};
+
+use std::collections::HashMap;
+use std::convert::TryInto;
+use std::ops::Div;
+use std::time::Instant;
 
 static mut C_CALLED: bool = false;
 static mut WORLD_TICK_INTERVAL: u32 = 0x32;
@@ -24,7 +29,7 @@ static mut APP: std::mem::MaybeUninit<App> = std::mem::MaybeUninit::uninit();
 
 static mut APP_INSTANT: std::mem::MaybeUninit<Instant> = std::mem::MaybeUninit::uninit();
 
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(CheckStructAlign)]
 pub struct App {
     #[check_align(0)]
@@ -180,14 +185,12 @@ pub struct App {
     last_tick_gap: u32,
 
     #[check_align(336)]
-    eame_map: [u8; 12], // std::map<std::string, CAOSVAR>
+    eame_map: Box<HashMap<String, CAOSVar>>,
+
+    _padding12: [u8; 8],
 }
 
 impl App {
-    pub fn add_basic_pray_directories(&mut self) {
-        unsafe { _add_basic_pray_directories(self) }
-    }
-
     pub fn new() -> Self {
         Self {
             save_required: false,
@@ -254,7 +257,7 @@ impl App {
             play_all_sounds_at_maximum_level_flag: false,
             autokill_agent_on_error_flag: false,
             _padding9: Default::default(),
-            elapsed_time_history: Vec::new(),
+            elapsed_time_history: vec![0; 10],
             _padding11: Default::default(),
             elapsed_time_history_index: 0,
             password: CppString::empty(),
@@ -266,44 +269,54 @@ impl App {
             maximum_distance_before_port_line_snaps: 800.0,
             last_timestamp: 0,
             last_tick_gap: 0xFFFFFFFF,
-            eame_map: Default::default(),
+            eame_map: Box::new(HashMap::new()),
+            _padding12: Default::default(),
         }
     }
 
-    // pub fn begin_wait_cursor(&self) -> bool {
-    // }
+    pub fn add_basic_pray_directories(&mut self) {
+        unsafe { _add_basic_pray_directories(self) }
+    }
 
     // pub fn change_resolution(&mut self) {
     // }
 
-    // pub fn create_new_world(&mut self, name: String) {
-    // }
+    pub fn create_new_world(&mut self, name: &str) -> std::io::Result<()> {
+        let fp = FilePath::new(name, 9, true, false);
+        let path = fp.full_path();
+        std::fs::create_dir(path)
+    }
 
     #[call_engine(0x0054ff50)]
     #[rustfmt::skip]
     unsafe fn create_progress_bar(&mut self) -> bool;
 
-    // pub fn debug_key_now(&mut self) -> bool {
-    //     false
-    // }
+    pub fn debug_key_now(&self) -> bool {
+        let debug = self.debug_key_now_no_shift();
+        let shift_down = self
+            .input_manager
+            .is_mod_down(sdl2::keyboard::Mod::LSHIFTMOD);
+        debug && shift_down
+    }
 
     pub fn debug_key_now_no_shift(&self) -> bool {
         let key = "engine_debug_keys";
-        unsafe { 
-            let caos_var = (*self.world).game_var(key);
+        unsafe {
+            let caos_var = self.game_var(key);
             caos_var.integer() == 1
         }
     }
 
-    // pub fn delete_eame_var(&mut self, var_name: String) {
-    // }
-
     pub fn disable_main_view(&mut self) {
-        unsafe { MainCamera::get().disable(); }
+        unsafe {
+            MainCamera::get_mut().disable();
+        }
     }
 
     pub fn disable_map_image(&mut self) {
-        unsafe { MainCamera::get().disable_map_image(); }
+        unsafe {
+            MainCamera::get_mut().disable_map_image();
+        }
     }
 
     fn do_load_world(&mut self, world: &str) {
@@ -317,11 +330,15 @@ impl App {
     // }
 
     pub fn enable_main_view(&mut self) {
-        unsafe { MainCamera::get().enable(); }
+        unsafe {
+            MainCamera::get_mut().enable();
+        }
     }
 
     pub fn enable_map_image(&mut self) {
-        unsafe { MainCamera::get().enable_map_image(); }
+        unsafe {
+            MainCamera::get_mut().enable_map_image();
+        }
     }
 
     // pub fn end_progress_bar(&mut self) {
@@ -330,11 +347,40 @@ impl App {
     // pub fn end_wait_cursor(&mut self) {
     // }
 
-    // pub fn eor_wolf_values(&mut self, i1: i32, i2: i32) -> int {
-    // }
+    /// Returns and.or sets teh Wolf values for the game.
+    pub fn eor_wolf_values(&mut self, and_mask: i32, eor_mask: i32) -> i32 {
+        let mut flags: i32 = 0;
 
-    // pub fn generate_window_title(&mut self) -> String {
-    // }
+        if self.display_rendering {
+            flags |= 1;
+        }
+
+        if self.fastest_ticks {
+            flags |= 2;
+        }
+
+        if self.refresh_display_at_end_of_tick {
+            flags |= 4;
+        }
+
+        if self.autokill_agent_on_error_flag {
+            flags |= 8;
+        }
+
+        flags = flags & and_mask ^ eor_mask;
+
+        self.display_rendering = flags & 1 == 1;
+
+        self.fastest_ticks = flags & 2 == 2;
+
+        self.refresh_display_at_end_of_tick = flags & 4 == 4;
+
+        self.autokill_agent_on_error_flag = flags & 8 == 8;
+
+        // Reset window title here.
+
+        flags
+    }
 
     // pub fn get_app_details(&mut self, d1: &String, d2: &String, d3: &String) -> bool {
     // }
@@ -342,17 +388,15 @@ impl App {
     // pub fn get_default_mng(&mut self) -> String {
     // }
 
-    pub fn eame_var(&mut self, var_name: &str) -> &mut CAOSVar {
-        let s = CppString::from(var_name);
-        unsafe { &mut *_eame_var(self, &s) }
+    pub fn eame_var(&mut self, key: &str) -> &mut CAOSVar {
+        self.eame_map.entry(key.to_string()).or_default()
     }
 
     // pub fn get_game_name(&mut self) -> String {
     // }
 
     pub fn game_var(&self, key: &str) -> &CAOSVar {
-        let s = CppString::from(key);
-        unsafe { &*_get_game_var(self, &s) }
+        unsafe { (*self.world).game_var(key) }
     }
 
     fn _key_from_lang_cfg(&self, key: &str, default: &str) -> String {
@@ -378,40 +422,32 @@ impl App {
     // pub fn get_network_user_id(&self) -> String {
     // }
 
-    // pub fn get_next_eame_var(&self, d: String) -> String {
-    // }
-
     // pub fn get_preview_window_handle(&self) -> HWND__ {
     // }
 
     // pub fn get_screen_saver_config(&self) -> bool {
     // }
 
-    pub fn get() -> &'static mut App {
+    pub fn get() -> &'static App {
         unsafe {
             if !C_CALLED {
                 log::debug!("App Construction called");
-                //APP = std::mem::MaybeUninit::new(App::new());
                 APP_INSTANT = std::mem::MaybeUninit::new(Instant::now());
-
-                _app_constructor(APP.as_mut_ptr());
-
-                std::ptr::write(&mut (*APP.as_mut_ptr()).user_settings, Configurator::new());
-                std::ptr::write(
-                    &mut (*APP.as_mut_ptr()).machine_settings,
-                    Configurator::new(),
-                );
-
-                {
-                    let mut v = Vec::new();
-                    for i in 0..10 {
-                        v.push(i);
-                    }
-                    std::ptr::write(&mut (*APP.as_mut_ptr()).elapsed_time_history, v);
-                }
+                APP = std::mem::MaybeUninit::new(App::new());
                 C_CALLED = true;
             }
+            &*APP.as_ptr()
+        }
+    }
 
+    pub fn get_mut() -> &'static mut App {
+        unsafe {
+            if !C_CALLED {
+                log::debug!("App Construction called");
+                APP_INSTANT = std::mem::MaybeUninit::new(Instant::now());
+                APP = std::mem::MaybeUninit::new(App::new());
+                C_CALLED = true;
+            }
             &mut *APP.as_mut_ptr()
         }
     }
@@ -456,7 +492,7 @@ impl App {
         log::debug!("Pretending to loading modules (no-op).");
 
         log::debug!("Loading syntax tables");
-        let caos_description = unsafe { CAOSDescription::get() };
+        let caos_description = unsafe { CAOSDescription::get_mut() };
         unsafe { caos_description.load_default_tables() };
 
         // An iterator through all modules, loading up their syntax would go
@@ -498,7 +534,7 @@ impl App {
         unsafe { self.set_up_main_view() };
 
         unsafe {
-            let main_camera = MainCamera::get();
+            let main_camera = MainCamera::get_mut();
             main_camera.enable();
         }
 
@@ -678,12 +714,12 @@ impl App {
 
         if self.display_rendering || self.refresh_display_at_end_of_tick {
             unsafe {
-                MainCamera::get().render();
+                MainCamera::get_mut().render();
             }
             self.refresh_display_at_end_of_tick = false;
         }
 
-        unsafe {
+        {
             let duration = ticks().unwrap();
 
             self.elapsed_time_history_index += 1;
@@ -739,17 +775,9 @@ fn ticks() -> Option<u32> {
 #[rustfmt::skip]
 unsafe fn _add_basic_pray_directories(app: *mut App);
 
-#[call_engine(0x0054cc60, "thiscall")]
-#[rustfmt::skip]
-unsafe fn _app_constructor(app: *mut App);
-
 #[call_engine(0x00550e10, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _do_load_world(app: &mut App, world: *const CppString);
-
-#[call_engine(0x00557c60, "thiscall")]
-#[rustfmt::skip]
-unsafe fn _eame_var(app: &mut App, world: &CppString) -> *mut CAOSVar;
 
 #[call_engine(0x00478e80, "thiscall")]
 #[rustfmt::skip]
@@ -758,4 +786,3 @@ unsafe fn _get_game_var(app: *const App, key: *const CppString) -> *const CAOSVa
 #[call_engine(0x00478e80)]
 #[rustfmt::skip]
 unsafe fn _quit_signalled();
-

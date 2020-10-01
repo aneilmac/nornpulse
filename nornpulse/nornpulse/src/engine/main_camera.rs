@@ -10,7 +10,11 @@ pub struct MainCamera {}
 impl MainCamera {
     #[call_engine(0x0057e730)]
     #[rustfmt::skip]
-    pub unsafe fn get() -> &'static mut MainCamera;
+    pub unsafe fn get() -> &'static MainCamera;
+
+    #[call_engine(0x0057e730)]
+    #[rustfmt::skip]
+    pub unsafe fn get_mut() -> &'static mut MainCamera;
 
     #[call_engine(0x0057e6d0)]
     #[rustfmt::skip]
@@ -23,7 +27,7 @@ impl MainCamera {
     #[call_engine(0x0054e8a7)]
     #[rustfmt::skip]
     pub unsafe fn disable(&mut self);
-    
+
     #[call_engine(0x0057e6c0)]
     #[rustfmt::skip]
     pub unsafe fn enable_map_image(&mut self);
