@@ -23,7 +23,7 @@ pub unsafe fn inject_calls() {
     replace_call!(0x0041d1b0, display_settings_error_next_tick);
     replace_call!(0x00550de0, do_i_need_to_get_password);
     // replace_call!(0x00550e10, do_load_world);
-    // replace_call!(0x0054fb20, do_refresh_from_game_variables);
+    replace_call!(0x0054fb20, do_refresh_from_game_variables);
     replace_call!(0x0041d530, do_you_only_play_midi_music);
     replace_call!(0x0054e890, enable_main_view);
     replace_call!(0x0054e8b0, enable_map_image);
@@ -31,9 +31,9 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x0054f960, end_wait_cursor);
     replace_call!(0x00555e50, eor_wolf_values);
     replace_call!(0x005566a0, generate_window_title);
-    // replace_call!(0x00551990, get_app_details);
+    replace_call!(0x00551990, get_app_details);
     replace_call!(0x0041d1d0, get_creature_pickup_status);
-    // replace_call!(0x00557e50, get_default_mng);
+    replace_call!(0x00557e50, get_default_mng);
     replace_call!(0x00557c60, get_eame_var);
     replace_call!(0x0041d580, get_fastest_ticks);
     replace_call!(0x0041d280, get_game_name);
@@ -75,7 +75,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x00557170, notify_new_nickname);
     replace_call!(0x0041d540, play_all_sounds_at_maximum_level);
     replace_call!(0x005511f0, process_command_line);
-    // replace_call!(0x00550df0, refresh_from_game_variables);
+    replace_call!(0x00550df0, refresh_from_game_variables);
     replace_call!(0x0041d3d0, set_game_name);
     replace_call!(0x00550b00, set_password);
     // replace_call!(0x0054e4d0, set_up_main_view);
@@ -86,7 +86,7 @@ pub unsafe fn inject_calls() {
     );
     replace_call!(0x0041d220, set_which_creature_permission_to_highlight);
     replace_call!(0x00557c10, set_world_tick_interval);
-    // replace_call!(0x0041d200, should_highlight_agents_known_to_creature);
+    replace_call!(0x0041d200, should_highlight_agents_known_to_creature);
     replace_call!(0x0041d1e0, should_skeletons_animate_double_speed);
     replace_call!(0x0041d1f0, set_should_skeletons_animate_double_speed);
     // replace_call!(0x0054e3d0, shut_down);
@@ -94,7 +94,7 @@ pub unsafe fn inject_calls() {
     // replace_call!(0x005502c0, start_progress_bar);
     // replace_call!(0x0054ec50, toggle_full_screen_mode);
     replace_call!(0x0041d550, toggle_midi);
-    // replace_call!(0x0054e000, update_app);
+    replace_call!(0x0054e000, update_app);
     // replace_call!(0x00550a90, update_progress_bar);
     replace_call!(0x0041d5b0, user_settings);
     replace_call!(0x0054e8d0, window_has_moved);
@@ -185,8 +185,9 @@ extern "thiscall" fn do_i_need_to_get_password(_app: &mut App) -> bool {
 // extern "thiscall" fn do_load_world(app: &mut App, world: CppString) {
 // }
 
-// extern "thiscall" fn do_refresh_from_game_variables(app: &mut App) {
-// }
+extern "thiscall" fn do_refresh_from_game_variables(app: &mut App) {
+    app.do_refresh_from_game_variables();
+}
 
 extern "thiscall" fn do_you_only_play_midi_music(app: &App) -> bool {
     app.only_play_midi_music_flag
@@ -221,15 +222,26 @@ extern "thiscall" fn generate_window_title(
     storage_ptr
 }
 
-// extern "thiscall" fn get_app_details(app: &mut App, d1: &CppString, d2: &CppString, d3: &CppString) -> bool {
-// }
+extern "thiscall" fn get_app_details(
+    _app: &mut App,
+    _d1: &CppString,
+    _d2: &CppString,
+    _d3: &CppString,
+) -> bool {
+    false // no-op. Only used for processing command line.
+}
 
 extern "thiscall" fn get_creature_pickup_status(app: &mut App) -> i32 {
     app.creature_pickup_status
 }
 
-// extern "thiscall" fn get_default_mng(app: &mut App) -> String {
-// }
+extern "thiscall" fn get_default_mng(app: &App, storage_pointer: *mut CppString) -> *mut CppString {
+    let s = CppString::from(app.default_mng());
+    unsafe {
+        std::ptr::write(storage_pointer, s);
+    }
+    storage_pointer
+}
 
 extern "thiscall" fn get_eame_var<'a>(app: &'a mut App, key: &CppString) -> &'a mut CAOSVar {
     let key = key.to_string();
@@ -410,8 +422,9 @@ extern "thiscall" fn process_command_line(_app: &mut App, _args: CppString) {
     // no-op
 }
 
-// extern "thiscall" fn refresh_from_game_variables(app: &mut App) {
-// }
+extern "thiscall" fn refresh_from_game_variables(app: &mut App) {
+    app.refresh_from_game_variables()
+}
 
 extern "thiscall" fn set_game_name(app: &mut App, name: &CppString) {
     app.game_name = name.clone();
@@ -442,8 +455,9 @@ extern "cdecl" fn set_world_tick_interval(tick: u32) {
     App::set_world_tick_interval(tick)
 }
 
-// extern "thiscall" fn should_highlight_agents_known_to_creature(app: &App) -> bool {
-// }
+extern "thiscall" fn should_highlight_agents_known_to_creature(app: &App) -> bool {
+    app.whether_we_should_highlight_agents_known_to_creature
+}
 
 extern "thiscall" fn should_skeletons_animate_double_speed(app: &App) -> bool {
     app.should_skeletons_animate_double_speed
@@ -469,8 +483,9 @@ extern "thiscall" fn toggle_midi(app: &mut App) {
     app.toggle_midi()
 }
 
-// extern "thiscall" fn update_app(app: &mut App) {
-// }
+extern "thiscall" fn update_app(_app: &mut App) {
+    // no-op
+}
 
 // extern "thiscall" fn update_progress_bar(app: &mut App, progress: i32) {
 // }

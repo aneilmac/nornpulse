@@ -26,6 +26,10 @@ impl World {
         let s = CppString::from(key);
         unsafe { &*_get_game_var(self, &s) }
     }
+
+    #[call_engine(0x00520f20, "fastcall")]
+    #[rustfmt::skip]
+    pub unsafe fn do_refresh_from_game_variables(&mut self);
 }
 
 #[call_engine(0x005204b0, "thiscall")]

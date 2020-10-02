@@ -326,8 +326,59 @@ impl App {
         }
     }
 
-    // pub fn do_refresh_from_game_variables(&mut self) {
-    // }
+    fn do_refresh_from_game_variables(&mut self) {
+        {
+            let v = self.game_var("engine_plane_for_lines");
+            let value = unsafe {
+                let i = v.integer();
+                if i == 0 && v.r#type() == 0 {
+                    0x270E
+                } else {
+                    i
+                }
+            };
+            self.line_plane = value;
+        }
+
+        unsafe {
+            let key = "engine_playAllSoundsAtMaximumLevel";
+            self.play_all_sounds_at_maximum_level_flag = self.game_var(key).integer() != 0;
+        }
+
+        unsafe {
+            let key = "engine_SkeletonUpdateDoubleSpeed";
+            self.should_skeletons_animate_double_speed = self.game_var(key).integer() != 0;
+        }
+
+        unsafe {
+            let key = "engine_usemidimusicsystem";
+            self.only_play_midi_music_flag = self.game_var(key).integer() != 0;
+        }
+
+        unsafe {
+            let key = "engine_creature_pickup_status";
+            let value = self.game_var(key);
+            if value.r#type() == 0 {
+                self.creature_pickup_status = value.integer();
+            }
+        }
+
+        unsafe {
+            let key = "engine_distance_before_port_line_warns";
+            let value = self.game_var(key);
+            if value.r#type() == 1 {
+                self.maximum_distance_before_port_line_warns = value.float();
+            }
+        }
+
+        unsafe {
+            let key = "engine_distance_before_port_line_snaps";
+            let value = self.game_var(key);
+            if value.r#type() == 1 {
+                self.maximum_distance_before_port_line_snaps = value.float();
+            }
+        }
+    }
 
     pub fn enable_main_view(&mut self) {
         unsafe {
@@ -382,18 +433,15 @@ impl App {
         flags
     }
 
-    // pub fn get_app_details(&mut self, d1: &String, d2: &String, d3: &String) -> bool {
-    // }
-
-    // pub fn get_default_mng(&mut self) -> String {
-    // }
+    pub fn default_mng(&self) -> &str {
+        self.user_settings
+            .get("Default Munge")
+            .unwrap_or("music.mng")
+    }
 
     pub fn eame_var(&mut self, key: &str) -> &mut CAOSVar {
         self.eame_map.entry(key.to_string()).or_default()
     }
-
-    // pub fn get_game_name(&mut self) -> String {
-    // }
 
     pub fn game_var(&self, key: &str) -> &CAOSVar {
         unsafe { (*self.world).game_var(key) }
@@ -404,8 +452,8 @@ impl App {
         language_config
             .get(key)
             .or(self.user_settings.get(key))
-            .map(|s| s.clone())
-            .unwrap_or(String::from(default))
+            .unwrap_or(default)
+            .to_string()
     }
 
     pub fn lang_catalogue(&self) -> String {
@@ -544,9 +592,7 @@ impl App {
 
         self.do_load_world("Startup");
 
-        unsafe {
-            self.refresh_from_game_variables();
-        }
+        self.refresh_from_game_variables();
 
         log::debug!("Setting up sound");
 
@@ -564,7 +610,7 @@ impl App {
         self.user_settings.bind_to_file("user.cfg")?;
 
         if let Some(game_name) = self.user_settings.get("Game Name") {
-            let game_name_str = game_name.clone();
+            let game_name_str = game_name.to_string();
             self.set_game_name(game_name_str.as_str());
         }
         Ok(())
@@ -590,9 +636,14 @@ impl App {
     // pub fn notify_new_nickname(&self, nickname: String) {
     // }
 
-    #[call_engine(0x00550df0)]
-    #[rustfmt::skip]
-    pub unsafe fn refresh_from_game_variables(&mut self);
+    pub fn refresh_from_game_variables(&mut self) {
+        self.do_refresh_from_game_variables();
+        if !self.world.is_null() {
+            unsafe {
+                (*self.world).do_refresh_from_game_variables();
+            }
+        }
+    }
 
     pub fn set_game_name(&mut self, name: &str) {
         self.game_name = CppString::from(name);
@@ -611,9 +662,6 @@ impl App {
             WORLD_TICK_INTERVAL = tick;
         }
     }
-
-    // pub fn should_highlight_agents_known_to_creature(&self) -> bool {
-    // }
 
     #[call_engine(0x0054e3d0)]
     #[rustfmt::skip]
@@ -778,10 +826,6 @@ unsafe fn _add_basic_pray_directories(app: *mut App);
 #[call_engine(0x00550e10, "thiscall")]
 #[rustfmt::skip]
 unsafe fn _do_load_world(app: &mut App, world: *const CppString);
-
-#[call_engine(0x00478e80, "thiscall")]
-#[rustfmt::skip]
-unsafe fn _get_game_var(app: *const App, key: *const CppString) -> *const CAOSVar;
 
 #[call_engine(0x00478e80)]
 #[rustfmt::skip]

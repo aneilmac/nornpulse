@@ -72,8 +72,8 @@ impl Configurator {
         Ok(())
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.config.get(key)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.config.get(key).map(|k| k.as_str())
     }
 
     fn load(&mut self) -> bool {
@@ -101,7 +101,6 @@ impl Configurator {
                     .insert(a.unwrap().to_string(), b.unwrap().to_string());
             }
         }
-        log::debug!("CONFIG {} is: {:?}", self.file_name, self.config);
         true
     }
 
