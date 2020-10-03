@@ -1,4 +1,5 @@
-pub mod agents;
+pub mod agent;
+pub mod agent_handle;
 pub mod app;
 pub mod camera;
 pub mod caos_description;
@@ -23,7 +24,7 @@ pub mod world;
 
 pub unsafe fn inject_calls() {
     flight_recorder::inject_calls();
-    agents::inject_calls();
+    agent_handle::inject_calls();
     app::inject_calls();
     creature_history::inject_calls();
     configurator::inject_calls();

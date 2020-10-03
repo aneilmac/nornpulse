@@ -1,7 +1,7 @@
+use crate::engine::agent_handle::AgentHandle;
 use crate::engine::caos_machine::CAOSMachine;
 use crate::engine::caos_var::CAOSVar;
 use crate::utils::cpp_adapter::CppString;
-use c2ers::agents::AgentHandle;
 
 type Call = extern "C" fn(&mut CAOSMachine) -> ();
 type GetInt = extern "C" fn(&mut CAOSMachine) -> i32;
