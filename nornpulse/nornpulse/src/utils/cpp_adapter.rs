@@ -21,6 +21,36 @@ pub struct CppString {
     capacity: usize,
 }
 
+impl CppString {
+    pub unsafe fn from_c_str(c_str_ptr: *const c_char) -> Self {
+        if c_str_ptr.is_null() {
+            return Self::empty();
+        }
+
+        let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
+        let len = c_str.to_bytes().len();
+        let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
+        // length + null terminator.
+        std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
+        *cpp_str_ptr = 0; // Ref count.
+        CppString {
+            allocator: 0x0,
+            data: cpp_str_ptr,
+            length: len,
+            capacity: len,
+        }
+    }
+
+    pub const fn empty() -> Self {
+        CppString {
+            allocator: 0,
+            data: std::ptr::null(),
+            length: 0,
+            capacity: 0,
+        }
+    }
+}
+
 impl std::fmt::Display for CppString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut str_copy = Vec::<u8>::with_capacity(self.length);
@@ -31,22 +61,21 @@ impl std::fmt::Display for CppString {
         }
 
         let len = str_copy
-        .iter()
-        .position(|c| *c == '\0' as u8)
-        .unwrap_or(str_copy.len());
+            .iter()
+            .position(|c| *c == '\0' as u8)
+            .unwrap_or(str_copy.len());
 
         str_copy.truncate(len);
 
         let wrapped_str = std::ffi::CString::new(str_copy).unwrap();
         let output = wrapped_str.to_str();
         match output {
-            Ok(s) =>  write!(f, "{}", s),
+            Ok(s) => write!(f, "{}", s),
             Err(utf8_err) => {
                 log::error!("{:?}", utf8_err);
-                write!(f, "[[C++ String has invalid UTF8.]]", )
+                write!(f, "[[C++ String has invalid UTF8.]]",)
             }
         }
-       
     }
 }
 
@@ -59,6 +88,12 @@ impl std::fmt::Debug for CppString {
 impl Into<String> for CppString {
     fn into(self) -> String {
         self.to_string()
+    }
+}
+
+impl From<&str> for CppString {
+    fn from(string: &str) -> Self {
+        CppString::from(string.to_string())
     }
 }
 
@@ -82,7 +117,7 @@ impl From<String> for CppString {
                 // COW ref-count.
                 *cpp_str_ptr = 0;
                 // Null terminate string.
-                *cpp_str_ptr.offset((len+1) as isize) = 0;
+                *cpp_str_ptr.offset((len + 1) as isize) = 0;
 
                 CppString {
                     allocator: 0,
@@ -122,32 +157,6 @@ impl Clone for CppString {
         let mut s = unsafe { CppString::from_c_str(self.data) };
         s.allocator = self.allocator;
         s
-    }
-}
-
-impl CppString {
-    pub unsafe fn from_c_str(c_str_ptr: *const c_char) -> Self {
-        let c_str = std::ffi::CStr::from_ptr(c_str_ptr);
-        let len = c_str.to_bytes().len();
-        let cpp_str_ptr = operator_new(len + 2) as *mut c_char;
-        // length + null terminator.
-        std::ptr::copy_nonoverlapping(c_str_ptr, cpp_str_ptr.offset(1), len + 1);
-        *cpp_str_ptr = 0; // Ref count.
-        CppString {
-            allocator: 0,
-            data: cpp_str_ptr,
-            length: len,
-            capacity: len,
-        }
-    }
-
-    pub const fn empty() -> Self {
-        CppString {
-            allocator: 0,
-            data: std::ptr::null(),
-            length: 0,
-            capacity: 0,
-        }
     }
 }
 

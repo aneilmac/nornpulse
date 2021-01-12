@@ -14,7 +14,7 @@ type StringMap = std::collections::HashMap<String, String>;
 
 #[derive(Debug)]
 pub struct Configurator {
-    _vptr: [u8;4],
+    _vptr: [u8; 4],
     config: Box<StringMap>,
     file_name: Box<String>,
 }
@@ -31,8 +31,8 @@ fn quote_write(s: &str, file: &mut impl Write) -> std::io::Result<()> {
 }
 
 impl Configurator {
-    pub fn bind_to_file(&mut self, file_name: String) -> std::io::Result<()> {
-        *self.file_name = file_name;
+    pub fn bind_to_file(&mut self, file_name: &str) -> std::io::Result<()> {
+        *self.file_name = file_name.to_string();
         self.load();
         Ok(())
     }
@@ -72,8 +72,8 @@ impl Configurator {
         Ok(())
     }
 
-    pub fn get(&self, key: &str) -> Option<&String> {
-       self.config.get(key)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.config.get(key).map(|k| k.as_str())
     }
 
     fn load(&mut self) -> bool {
@@ -84,27 +84,23 @@ impl Configurator {
                 let mut iter = record.into_inner();
                 let a = snailquote::unescape(iter.next().unwrap().as_str());
                 let b = snailquote::unescape(iter.next().unwrap().as_str());
-                
+
                 if a.is_err() {
-                  let a = a.unwrap_err();
-                  log::debug!("{}", a.to_string());
-                  continue;
+                    let a = a.unwrap_err();
+                    log::debug!("{}", a.to_string());
+                    continue;
                 }
 
                 if b.is_err() {
-                  let b = b.unwrap_err();
-                  log::debug!("{}", b.to_string());
-                  continue;
+                    let b = b.unwrap_err();
+                    log::debug!("{}", b.to_string());
+                    continue;
                 }
 
-
-                self.config.insert(
-                  a.unwrap().to_string(),
-                  b.unwrap().to_string(),
-                );
+                self.config
+                    .insert(a.unwrap().to_string(), b.unwrap().to_string());
             }
         }
-        log::debug!("CONFIG {} is: {:?}", self.file_name, self.config);
         true
     }
 

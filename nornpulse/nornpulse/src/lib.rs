@@ -26,7 +26,7 @@ pub extern "stdcall" fn nornpulse_main(
     cmd_line: LPSTR,
     _show_cmd: i32,
 ) -> i32 {
-    log::set_logger(&c2ers::flight_recorder::FLIGHT_RECORDER)
+    log::set_logger(&engine::flight_recorder::FLIGHT_RECORDER)
         .map(|()| log::set_max_level(log::LevelFilter::Debug))
         .expect("Failed to set the FlightLogger. Aborting.");
 
