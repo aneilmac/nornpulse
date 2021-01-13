@@ -44,7 +44,7 @@ cargo build
 This project can be described in distinct phases:
 
 1. From the top down, replace C++ ABI calls with unsafe rust functions. (In progress.)
-2. Remove requirement of haivng `engine.exe` and its dependencies. Have the project only run through compiled rust code.
+2. Remove requirement of running through `engine.exe` and remove dependency on the `winapi` crate.
 3. Port and rearchitect unsafe rust code to safe rust code.
 4. Introduce new features!
 
