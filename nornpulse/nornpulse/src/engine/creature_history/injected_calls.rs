@@ -1,3 +1,5 @@
+use std::ptr::read_unaligned;
+
 use super::*;
 use crate::utils::cpp_adapter::CppString;
 
@@ -18,62 +20,128 @@ pub struct FFILifeEvent {
 fn to_life_event(le: &FFILifeEvent) -> LifeEvent {
     let e: EventType = match le.event_type {
         0x00 => EventType::Conceived {
-            mother: le.moniker_a.to_string(),
-            father: le.moniker_b.to_string(),
+            mother: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            father: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x01 => EventType::Spliced {
-            first_source: le.moniker_a.to_string(),
-            second_source: le.moniker_b.to_string(),
+            first_source: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            second_source: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x02 => EventType::Engineered {
-            genome_file: le.moniker_b.to_string(),
+            genome_file: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x03 => EventType::Born {
-            mother: le.moniker_a.to_string(),
-            father: le.moniker_b.to_string(),
+            mother: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            father: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x04 => EventType::Aged,
         0x05 => EventType::Exported,
         0x06 => EventType::Imported,
         0x07 => EventType::Died,
         0x08 => EventType::BecamePregnant {
-            child: le.moniker_a.to_string(),
-            father: le.moniker_b.to_string(),
+            child: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            father: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x09 => EventType::Impregnated {
-            child: le.moniker_a.to_string(),
-            mother: le.moniker_b.to_string(),
+            child: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            mother: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0A => EventType::ChildBorn {
-            child: le.moniker_a.to_string(),
-            father: le.moniker_b.to_string(),
+            child: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            father: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0B => EventType::LaidByMother {
-            mother: le.moniker_a.to_string(),
+            mother: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0C => EventType::LaidAnEgg {
-            child: le.moniker_a.to_string(),
+            child: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0D => EventType::PhotoTaken {
-            target: le.photo_target.to_string(),
+            target: {
+                let unaligned = std::ptr::addr_of!(le.photo_target);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0E => EventType::Cloned {
-            source: le.moniker_a.to_string(),
+            source: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x0F => EventType::CloneSource {
-            clone: le.moniker_a.to_string(),
+            clone: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
         0x10 => EventType::WarpedOut,
         0x11 => EventType::WarpedIn,
         _ => EventType::Custom {
             event_id: le.event_type,
-            moniker_a: le.moniker_a.to_string(),
-            moniker_b: le.moniker_b.to_string(),
+            moniker_a: {
+                let unaligned = std::ptr::addr_of!(le.moniker_a);
+                unsafe { read_unaligned(unaligned).to_string() }
+            },
+            moniker_b: {
+                let unaligned = std::ptr::addr_of!(le.moniker_b);
+                unsafe { read_unaligned(unaligned).to_string() }
+            }
         },
     };
     LifeEvent {
-        world_moniker: le.world_moniker.to_string(),
-        world_name: le.world_name.to_string(),
+        world_moniker: {
+            let unaligned = std::ptr::addr_of!(le.world_moniker);
+            unsafe { read_unaligned(unaligned).to_string() }
+        },
+        world_name: {
+            let unaligned = std::ptr::addr_of!(le.world_name);
+            unsafe { read_unaligned(unaligned).to_string() }
+        },
         event: e,
     }
 }
@@ -81,26 +149,27 @@ fn to_life_event(le: &FFILifeEvent) -> LifeEvent {
 impl std::fmt::Debug for FFILifeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let et = self.event_type;
-        write!(
-            f,
-            "LifeEvent {{ type: \"{}\",
-           |  female_parent: {},
-           |  male_parent: {},
-           |  3: {},
-           |  photo_target: {},
-           |  world_name: {}, 
-           |  world_moniker: {}, 
-           |  7: {}, 
-           }}",
-            et,
-            self.moniker_a,
-            self.moniker_b,
-            self.string_3,
-            self.photo_target,
-            self.world_name,
-            self.world_moniker,
-            self.string_7
-        )
+        write!(f, "LifeEvent {}", et)
+        // write!(
+        //     f,
+        //     "LifeEvent {{ type: \"{}\",
+        //    |  female_parent: {},
+        //    |  male_parent: {},
+        //    |  3: {},
+        //    |  photo_target: {},
+        //    |  world_name: {}, 
+        //    |  world_moniker: {}, 
+        //    |  7: {}, 
+        //    }}",
+        //     et,
+        //     self.moniker_a,
+        //     self.moniker_b,
+        //     self.string_3,
+        //     self.photo_target,
+        //     self.world_name,
+        //     self.world_moniker,
+        //     self.string_7
+        // )
     }
 }
 

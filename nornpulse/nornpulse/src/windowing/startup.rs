@@ -72,7 +72,7 @@ impl GameLoop {
 
             let continue_game = attempt_app_update(&rx);
             if !continue_game {
-                break 'game_loop;
+               break 'game_loop;
             }
         }
 
@@ -271,7 +271,7 @@ fn make_timer_pair<'a>(
 ) -> (mpsc::Receiver<()>, sdl2::timer::Timer<'a, 'a>) {
     let (tx, rx) = mpsc::sync_channel::<()>(0);
     let timer = timer_subsystem.add_timer(
-        0,
+        5,
         Box::new(move || {
             // Desired behaviour is that send blocks until the reciever accepts the current
             // send, so multiple ticks can't trigger.

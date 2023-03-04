@@ -13,7 +13,8 @@ impl SharedGallery {
 
     pub fn set_creature_gallery_folder(&mut self, folder: &str) {
         unsafe {
-            std::ptr::write(&mut self.gallery_string, CppString::from(folder));
+            let unaligned = std::ptr::addr_of_mut!(self.gallery_string);
+            std::ptr::write(unaligned, CppString::from(folder));
         }
     }
 
